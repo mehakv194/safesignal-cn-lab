@@ -129,12 +129,14 @@ Backoff starts around 0.4–0.5s, caps at 30s, with jitter. One worker per outbo
 
 ## Git and publication
 
+Published public repository: [mehakv194/safesignal-cn-lab](https://github.com/mehakv194/safesignal-cn-lab).
+
 Real phase commits and verification notes: [findings](docs/findings.md). Feature
 branches merge to main after checks. MIT license approved by project owner.
 Original synopsis remains a local reference under ignored starter/ because it
 contains enrollment numbers. The five source specifications are preserved in docs.
 
-Publication is approved, but requires valid GitHub CLI login. If no remote exists:
+For a separate checkout without a remote, publish only after reviewing its content:
 
 ```sh
 gh auth login --hostname github.com --git-protocol https --web
@@ -142,4 +144,4 @@ gh repo create safesignal-cn-lab --public --source=. --remote=origin --push
 git push origin --all
 ```
 
-Do not claim this repository is published until a remote push actually succeeds.
+This project's main and phase branches were actually pushed; no history was rewritten.

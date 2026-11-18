@@ -105,3 +105,39 @@ one server row, one duplicate suppression; reset normal. PNG chart download
 successfully saved from browser and copied to docs/results/comparison.png.
 Sender/responder screenshots updated. Services left running locally for review.
 No 1366x768 exact-size validation claim; browser used native viewport.
+
+## Publication and commit summary
+
+Public repository actually created and pushed:
+https://github.com/mehakv194/safesignal-cn-lab (PUBLIC; default branch main).
+All phase branches pushed. Final implementation merge `732fed5`, release feature
+commit `6a7c632`. Owner confirmed login completed. Public-content scan of 56
+tracked files passed: no generated credentials, private keys, enrollment numbers,
+database files or captures. Original DOCX, generated state and secrets excluded.
+`git diff --cached --check` passed; clean working tree after implementation merge.
+
+| Phase | Branch | Implementation commit |
+|---|---|---|
+| 0 | codex/skeleton | da92830 |
+| 1 | codex/transport | d4b3710 |
+| 2 | codex/reliability | adbf41a |
+| 3 | codex/ui | e135025 |
+| 4 | codex/chaos-lab | 6308529 |
+| 5 | codex/network-lab | d0c83e6 |
+| 6 | codex/release | 6a7c632 |
+
+Fresh local final suite: 19 passed in 13.33s. Last template refinement:
+2 web tests passed in 1.72s. PNG download verified through browser. CI run for
+implementation merge: https://github.com/mehakv194/safesignal-cn-lab/actions/runs/44324181360
+(result recorded after completion below).
+
+Known omissions: NS2 execution and Wireshark capture unavailable; exact 1366x768
+viewport QA not established; real multi-device LAN test not performed. No optional
+UDP, mapping, external integrations or AI added. Local lab only, no production or
+emergency-service guarantee. User-authenticated browser tabs and local services
+left open for review; generated data is synthetic and persists on local disk.
+
+Publication CI completed successfully on both ubuntu-latest and windows-latest
+for implementation merge 732fed5. Dependencies installed from requirements.txt
+and python -m pytest -q succeeded on both. Thus Linux/Windows automated integration
+checks are now verified; macOS and multi-device LAN remain untested.

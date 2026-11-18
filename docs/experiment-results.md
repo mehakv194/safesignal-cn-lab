@@ -42,3 +42,6 @@ Final QA: fresh virtual environment, **19 passed in 13.33s**. Includes actual
 abrupt sender-process exit and recovery, maximum Unicode frame pagination,
 validated filters, login throttle and non-destructive database archiving.
 PNG chart export verified through browser: docs/results/comparison.png.
+
+Public GitHub Actions run 44324181360 passed on both Ubuntu and Windows after
+publication. See https://github.com/mehakv194/safesignal-cn-lab/actions/runs/44324181360 .
