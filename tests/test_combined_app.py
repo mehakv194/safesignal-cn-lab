@@ -36,6 +36,7 @@ def test_one_origin_dashboards_and_persistence(tmp_path):
                 break
             time.sleep(.1)
         assert 'TEST ONLY: first-aid' in page.get_data(as_text=True)
+
         responder_login=client.get('/responder/login',base_url='https://campus.example')
         assert client.post('/responder/login',base_url='https://campus.example',data={'csrf':csrf(responder_login),'token':'r'*32}).status_code==302
         assert client.get('/responder/',base_url='https://campus.example').status_code==200
@@ -48,3 +49,18 @@ def test_one_origin_dashboards_and_persistence(tmp_path):
         client.post('/sender/login',base_url='https://campus.example',data={'csrf':csrf(page),'token':'s'*32})
         page=client.get('/sender/',base_url='https://campus.example')
         assert 'TEST ONLY: first-aid' in page.get_data(as_text=True)
+
+
+def test_free_plan_configuration_and_retention_notice(tmp_path):
+    from pathlib import Path
+    from safesignal.sender_store import Outbox
+    from safesignal.web import create_app
+    from test_web import login
+    blueprint=(Path(__file__).resolve().parents[1]/'render.yaml').read_text()
+    settings=[line.strip() for line in blueprint.splitlines() if line.strip() and not line.lstrip().startswith('#')]
+    assert [line for line in settings if line.startswith('plan:')]==['plan: free']
+    assert 'disk:' not in settings
+    config=dict(sender_token='sender',responder_token='responder',session_secret='test-only',ephemeral_storage=True)
+    client=create_app('sender',config,lambda *args:dict(status='OK'),Outbox(tmp_path/'box.sqlite')).test_client()
+    login(client,'sender')
+    assert 'reports can reset when the host restarts' in client.get('/').get_data(as_text=True)

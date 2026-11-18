@@ -1,56 +1,58 @@
-# Single Python app deployment — prepared, not provisioned
+# Single Python app — free-only deployment
 
-User approved one permanent web address with separate dashboards and explicitly
-requires approval before paid services. Netlify preparation was deferred in favor
-of one Python hosting service. No Netlify project, paid service or disk created.
+The user explicitly requires FREE plans only and declined Supabase or any separate
+cloud database. No Supabase project/database was created. No billing upgrade,
+paid instance, persistent disk, external database or trial subscription is allowed.
 
 ## What runs
 
-`python -m safesignal.hosted` starts one process: Waitress serves `/`, `/sender/`,
-`/responder/` and `/healthz`. One worker handles one SQLite outbox; a private
-loopback TLS socket server owns authoritative incident state. No raw TCP port is
-publicly exposed. Browser ingress uses the hosting provider's HTTPS termination.
-The local equivalent is `python scripts/run_app.py --enable-demo-faults` at :5000.
+One Render Free Python web service, one instance. Waitress serves the landing
+page, /sender/, /responder/ and /healthz. The existing private verified TLS/TCP
+server and sender worker run inside the same process. SQLite is stored under
+/tmp/safesignal. No public raw-TCP port or extra hosted service is needed.
 
-## Concrete Render configuration
+render.yaml specifies plan: free and contains NO disk stanza. The provider
+creates three random environment secrets through generateValue; actual secret
+values are never committed or included in browser source. The owner can obtain
+their dashboard access tokens from the service's Environment page.
 
-`render.yaml`: one Python Starter web service, one instance, 1GB persistent disk
-at `/var/data`, build `pip install -r requirements-hosted.txt`, start
-`python -m safesignal.hosted`, health check `/healthz`. This is a PAID configuration;
-review the current provider quote and obtain approval before applying it.
-Free ephemeral storage would lose SQLite state and does not meet persistence goals.
+Build: pip install -r requirements-hosted.txt
+Start: python -m safesignal.hosted
+Health check: /healthz
+SAFESIGNAL_DATA_DIR=/tmp/safesignal
+SAFESIGNAL_EPHEMERAL_STORAGE=1
+ENABLE_DEMO_FAULTS=0
 
-Three independent random secrets (at least 32 characters) are required:
-SAFESIGNAL_SENDER_TOKEN, SAFESIGNAL_RESPONDER_TOKEN, SAFESIGNAL_SESSION_SECRET.
-The owner enters these in the hosting dashboard; never put them in Git or chat.
-RENDER_EXTERNAL_HOSTNAME is allowed automatically; other domains require an exact
-SAFESIGNAL_ALLOWED_HOSTS comma-separated allowlist. No wildcard host allowance.
-Secure, HttpOnly, SameSite=Lax cookies have separate role names and paths.
-HTTPS scheme is trusted from one ingress proxy; forwarded Host is not trusted.
+## Important free-plan behavior
 
-ENABLE_DEMO_FAULTS defaults to 0. If enabled for a protected synthetic presentation,
-settings reset to Normal on startup. A persistent disk stores both databases,
-fault configuration and evidence. Do not scale replicas: SQLite and one shared
-outbox require one service instance. Back up the disk through provider facilities.
+Render Free can sleep after inactivity and restart with an empty filesystem.
+The provider URL remains stable while the service exists; this is not an always-on
+or lifetime availability guarantee. Incident reports, outbox and audit data may
+reset on a host restart/redeploy. The UI explicitly discloses this. Export evidence
+before a restart if needed. Local SQLite lab data is unaffected by cloud resets.
 
-## Review before public release
+This is the deliberate free-only compromise after the user declined a separate
+free cloud database. It does not meet the earlier cross-restart hosted-persistence
+goal, and must not be presented as meeting it. Browser offline storage is also
+not implemented. No real emergency dispatch.
 
-1. Approve the actual hosting/disk quote; connect the owner's hosting account.
-2. Owner supplies infrastructure secrets in the provider dashboard.
-3. Deploy reviewed commit and verify `/healthz`, HTTPS/host restrictions and login.
-4. Submit → acknowledge/assign → in progress/note → resolve through the public URL.
-5. Restart the service and verify the same incident IDs and state survive.
+Official limits: https://render.com/docs/free . Never switch to Starter or add a
+paid disk to bypass these limits. If free quotas are exhausted, accept suspension
+or wait for renewal; do not enable billing, paid add-ons or paid overages.
 
-Public release is not claimed until these steps actually succeed. The prepared
-runtime has local integration coverage for mounted routes, HTTPS/secure cookies,
-CSRF, real private TLS submission, role checks and full runtime restart persistence.
+## Deploy and verify
 
-## Truthful limits
+1. Owner signs into Render (interactive credentials remain with owner).
+2. Create a Free web service from this repository/configuration. No billing setup.
+3. Confirm Free/$0 before final deployment. Use only the free provider subdomain.
+4. Verify public HTTPS root, /healthz, sender/responder login and incident workflow.
+5. Record the actual URL and deployment result. Do not invent a live URL.
 
-The shared sender queue is on the Python host. A browser without access to the
-website cannot submit or save offline; IndexedDB/service-worker queuing is not
-implemented. Internal TLS/TCP traffic is within one host, not a measured WAN path.
-Reviewed local experiment results are explicitly labeled when copied to hosted
-Evidence; they are not hosted-network measurements. There is one shared demo
-sender and one authenticated response-desk principal with synthetic teams.
-No real emergency dispatch, production security proof or uptime guarantee.
+Host allowlist uses RENDER_EXTERNAL_HOSTNAME automatically. Additional domains
+require SAFESIGNAL_ALLOWED_HOSTS; no wildcard host acceptance. Role cookies are
+Secure, HttpOnly and SameSite=Lax with separate names/paths. Trust one ingress
+proxy's forwarded scheme, not forwarded Host. Keep one service instance only.
+
+The local equivalent remains python scripts/run_app.py --enable-demo-faults at
+http://127.0.0.1:5000 with durable local SQLite. Stop the existing app before starting
+another worker against the same local outbox.

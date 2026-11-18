@@ -22,7 +22,8 @@ def create_app(role, config, call, outbox=None, faults=None):
 
     @app.context_processor
     def deployment_context():
-        return {'hosted': config.get('hosted', False), 'combined':config.get('combined',False), 'role':role,'categories':CATEGORIES,
+        return {'hosted': config.get('hosted', False), 'combined':config.get('combined',False),
+                'ephemeral_storage':config.get('ephemeral_storage',False), 'role':role,'categories':CATEGORIES,
                 'severities':SEVERITIES,'incident_states':INCIDENT_STATES,'teams':RESPONSE_TEAMS,
                 'today':datetime.now(timezone.utc).strftime('%d %b %Y'), 'local_role_url':
                 ('http://127.0.0.1:5002/' if role=='sender' else 'http://127.0.0.1:5001/')}

@@ -123,8 +123,10 @@ this is not a multi-user institutional account system.
 
 The same app can run as one Python service with one public HTTPS address.
 [Deployment configuration and approval boundary](docs/hosting.md).
-`render.yaml` is prepared, but **no paid service or persistent disk has been
-created**. Hosting requires owner approval and account configuration.
+`render.yaml` uses **only Render Free, no paid disk and no external database**.
+The hosted SQLite files can reset when the free server restarts. The provider
+website address stays the same while the service exists; free instances can sleep.
+Local lab databases remain on your own disk. Account sign-in is needed to deploy.
 
 ## Configuration, retention and limits
 
