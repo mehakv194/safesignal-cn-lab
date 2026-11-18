@@ -83,3 +83,6 @@ observed SERVER_RECEIVED, clicked responder ACK, observed sender terminal state.
 Screenshots saved under docs/screenshots. Requested viewport override 1366x768;
 browser capture retained its native 1086px width, so exact-size QA is not claimed.
 Chart and metrics visibly rendered in browser. No private data in screenshots.
+
+## Phase 5
+Chaos/evidence commit 6308529 merged; 15 tests passed in 11.88s including maximum Unicode payload pagination. Independent four-node NS2 TCL scenarios and strict legacy wired-trace parser added. Parser synthetic fixture: 1 passed in 0.09s. NS2 executable unavailable, so simulation NOT RUN; no trace values claimed. Wireshark instructions added, capture NOT RUN. Verified legacy trace format against official NS2 documentation.
