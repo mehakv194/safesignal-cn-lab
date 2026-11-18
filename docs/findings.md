@@ -48,3 +48,13 @@ wrong certificate rejected. Sandbox blocks loopback, so test execution required
 elevated tool access. Default pytest temp location also inaccessible; explicit
 ASCII basetemp used. Initial runs failed on these environment constraints before
 test execution; no security fallback added.
+
+## Phase 2
+
+Transport commit `d4b3710` merged to main. Durable outbox saves before submission,
+claims sends transactionally, records attempts and timeline, recovers SENDING on
+startup, and applies capped jittered exponential backoff. Polling after receipt
+does not resubmit; responder terminal state never regresses. One worker per
+outbox is the supported orchestration model. SQLite errors surface rather than
+silently claiming data saved. Restart test uses a separate Python process.
+`python -m pytest -q --basetemp=<ASCII path>`: **11 passed in 6.90s**, including actual lost application receipt after commit and same UUID retry.
