@@ -14,6 +14,8 @@ def validate_alert(p):
         raise ValueError('Invalid alert fields')
     if any(not isinstance(v, str) for v in p.values()):
         raise ValueError('String fields required')
+    for value in p.values():
+        value.encode('utf-8')
     if str(UUID(p['alert_id'])) != p['alert_id']:
         raise ValueError('Canonical UUID required')
     if p['severity'] not in SEVERITIES:

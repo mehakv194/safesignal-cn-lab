@@ -64,6 +64,8 @@ class Outbox:
                        (state, reply['server_received_at'], reply.get('responder_acknowledged_at'), aid))
             if row[0] != state:
                 db.execute('INSERT INTO journey(alert_id,event,recorded_at) VALUES (?,?,?)', (aid, state, now()))
+                if reply.get('duplicate'):
+                    db.execute('INSERT INTO journey(alert_id,event,recorded_at) VALUES (?,?,?)', (aid, 'DUPLICATE_SUPPRESSED', now()))
 
     def retry_now(self, aid):
         with self.connect() as db:

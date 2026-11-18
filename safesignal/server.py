@@ -16,6 +16,12 @@ class Handler(socketserver.BaseRequestHandler):
             with self.server.context.wrap_socket(self.request, server_side=True) as sock:
                 req = protocol.receive(sock)
                 response = self.server.dispatch(req)
+                if req.get('type') == 'SUBMIT_ALERT' and response.get('status') == 'OK' and self.server.faults:
+                    preset = self.server.faults.preset()
+                    if preset == 'ack_lost' and not response.get('duplicate'):
+                        return  # Receipt suppressed only after the store transaction committed.
+                    if preset == 'delay':
+                        time.sleep(1.5)
                 protocol.send(sock, response)
         except (OSError, EOFError, ValueError, TypeError):
             # Malformed peers must not kill the listener or expose request content.
@@ -26,10 +32,11 @@ class AlertServer(socketserver.ThreadingTCPServer):
     allow_reuse_address = True
     daemon_threads = True
 
-    def __init__(self, address, context, store, sender_token, responder_token):
+    def __init__(self, address, context, store, sender_token, responder_token, faults=None):
         if not sender_token or not responder_token or sender_token == responder_token:
             raise ValueError('Distinct nonempty role tokens required')
         self.context, self.store = context, store
+        self.faults = faults
         self.tokens = {'sender': sender_token, 'responder': responder_token}
         self.rate_lock = threading.Lock()
         self.rates = {}
@@ -68,7 +75,10 @@ class AlertServer(socketserver.ThreadingTCPServer):
             elif kind == 'GET_STATUS':
                 result = self.store.status(payload['alert_id'])
             elif kind == 'LIST_ALERTS':
-                result = dict(status='OK', code='ALERTS', alerts=self.store.listing())
+                offset = payload.get('offset', 0)
+                if type(offset) is not int or offset < 0:
+                    raise ValueError()
+                result = dict(status='OK', code='ALERTS', alerts=self.store.listing(offset))
             elif kind == 'ACK_ALERT':
                 result = self.store.acknowledge(payload['alert_id'])
             else:

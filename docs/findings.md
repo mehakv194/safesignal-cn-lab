@@ -61,3 +61,25 @@ silently claiming data saved. Restart test uses a separate Python process.
 
 ## Phase 3
 Reliability commit adbf41a merged. Separate authenticated Flask portals with CSRF, escaped templates, strict loopback Host checking, no-store/CSP headers, session login throttling and distinct cookies. Worker independent of browser. Orchestrator starts three processes. Full suite: 12 passed in 8.39s; web adapter tests use live TLS backend. Browser visual verification pending. Local JSON configuration chosen instead of dotenv to avoid another dependency; SAFESIGNAL_* environment overrides supported.
+
+## Phase 4
+
+UI commit `e135025` merged. Guarded app faults default off: use
+`scripts/run_demo.py --enable-demo-faults`. Normal resets; delay applies 1500ms
+before receipt; lost receipt closes after commit only on first new submission;
+disconnect prevents sender connections. Settings shared atomically via ignored
+local JSON. Small responder pages (5 alerts) keep responses under 16KiB even for
+maximum Unicode payloads; priority ordering happens before pagination.
+
+Full suite **14 passed in 11.96s**. Seeded experiment uses isolated server SQLite
+files and actual loopback TLS, fixed repeating fault schedule, per-alert deadline,
+client-monotonic confirmation timing, nearest-rank p95, CSV/JSON/SVG. PNG export
+uses the browser canvas, avoiding a plotting dependency. Same immutable UUIDs
+across isolated policy runs; no production database reused. Retention: local
+demo data stays until explicitly archived/reset by owner.
+
+Browser verification: logged into both portals, submitted synthetic alert,
+observed SERVER_RECEIVED, clicked responder ACK, observed sender terminal state.
+Screenshots saved under docs/screenshots. Requested viewport override 1366x768;
+browser capture retained its native 1086px width, so exact-size QA is not claimed.
+Chart and metrics visibly rendered in browser. No private data in screenshots.

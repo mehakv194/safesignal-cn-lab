@@ -1,0 +1,13 @@
+policy,index,alert_id,fault,attempts,received,duplicates,confirmation_seconds,server_receipt_seconds
+single_attempt,0,6513270e-269e-4d37-b2a7-4de452e6b438,disconnect,1,False,0,,
+single_attempt,1,1818e811-892f-402b-923f-0824128b2f33,ack_lost,1,True,0,,0.025434
+single_attempt,2,36f675cc-81e7-4ef5-a8e2-5d940ed90475,normal,1,True,0,0.01793790003284812,0.012455
+single_attempt,3,6b0d549b-6f03-475a-9600-a35a099950d8,disconnect,1,False,0,,
+single_attempt,4,0f21ddb6-6cad-4a26-8d11-6ece1738f7d9,ack_lost,1,True,0,,0.012525
+single_attempt,5,a170b338-3926-4059-b28c-105d1fb17c23,normal,1,True,0,0.03258860018104315,0.027555
+retry_dedup,0,6513270e-269e-4d37-b2a7-4de452e6b438,disconnect,2,True,0,0.26383580011315644,0.256698
+retry_dedup,1,1818e811-892f-402b-923f-0824128b2f33,ack_lost,2,True,1,0.26580439996905625,0.019251
+retry_dedup,2,36f675cc-81e7-4ef5-a8e2-5d940ed90475,normal,1,True,0,0.024723599897697568,0.017793
+retry_dedup,3,6b0d549b-6f03-475a-9600-a35a099950d8,disconnect,2,True,0,0.2516449000686407,0.243816
+retry_dedup,4,0f21ddb6-6cad-4a26-8d11-6ece1738f7d9,ack_lost,2,True,1,0.2844664000440389,0.018074
+retry_dedup,5,a170b338-3926-4059-b28c-105d1fb17c23,normal,1,True,0,0.01902980008162558,0.01351

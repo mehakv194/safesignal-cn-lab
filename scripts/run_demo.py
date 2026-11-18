@@ -1,4 +1,5 @@
 import os
+import argparse
 from pathlib import Path
 import subprocess
 import sys
@@ -8,6 +9,12 @@ import time
 if __name__ == '__main__':
     root = Path(__file__).resolve().parents[1]
     os.chdir(root)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--enable-demo-faults', action='store_true')
+    args = parser.parse_args()
+    os.environ['ENABLE_DEMO_FAULTS'] = '1' if args.enable_demo_faults else '0'
+    if args.enable_demo_faults:
+        Path('local/faults.json').write_text('{"preset":"normal"}')
     if not Path('local/config.json').exists():
         raise SystemExit('Run scripts/init_demo.py first.')
     processes = []

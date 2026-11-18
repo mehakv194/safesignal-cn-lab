@@ -1,0 +1,13 @@
+{% extends 'base.html' %}{% block content %}
+<div class="eyebrow">EVIDENCE LAB / ACTUAL OBSERVATIONS</div><h1>Measure the journey.</h1>
+<p><a href="/">← Console</a></p>
+{% if report %}<p>Run {{ report.run_id }} · seed {{ report.seed }} · {{ report.count }} alerts per policy · per-alert observation window {{ report.observation_seconds }}s</p>
+<img id="comparison-chart" src="/evidence/comparison.svg" alt="Observed receipt ratio comparison" width="600">
+<div class="layout">{% for policy, summary in report.policies.items() %}<section class="panel"><h2>{{ policy|replace('_',' ') }}</h2>
+{% for label,value in summary.items() %}<p>{{ label|replace('_',' ') }}: <strong>{{ (value|round(3) if value is float else value) if value is not none else 'N/A' }}</strong></p>{% endfor %}</section>{% endfor %}</div>
+<p><a href="/evidence/results.csv" download>Raw CSV</a> · <a href="/evidence/summary.json" download>Run config + metrics JSON</a> · <a href="/evidence/comparison.svg" download>Chart SVG</a></p>
+<button id="export-chart" class="secondary">Download chart PNG</button>
+<p>Confirmation latency uses client monotonic time. Server receipt latency in CSV uses UTC clocks on one host. p95 uses nearest rank. Sample size shown above. A lost application receipt can leave an alert stored but unconfirmed. This test scenario is deliberately chosen; these results are not a universal reliability improvement.</p>
+{% else %}<section class="panel"><h2>No experiment has run yet</h2><p>Run <code>python scripts/run_experiments.py</code> in the project virtual environment. Reports will use actual loopback TLS measurements.</p></section>{% endif %}
+<p>NS2 is an independent network experiment. Application faults do not emulate or measure IP packet loss.</p>
+{% endblock %}
