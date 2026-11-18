@@ -45,3 +45,12 @@ PNG chart export verified through browser: docs/results/comparison.png.
 
 Public GitHub Actions run 44324181360 passed on both Ubuntu and Windows after
 publication. See https://github.com/mehakv194/safesignal-cn-lab/actions/runs/44324181360 .
+
+## Campus dashboard verification run
+
+Actual loopback TLS comparison run 20261118T154011757239, seed 7, 6 alerts per
+policy, 2 seconds per alert, same repeated application fault schedule. Single
+attempt stored 4/6 (2 confirmed); retry stored 6/6 (6 confirmed), 4 retries,
+2 duplicate suppressions. Median confirmation 0.01875s vs 0.24011s; nearest-rank
+p95 0.01907s vs 0.27908s. Small chosen scenario, no universal improvement claim.
+Raw outputs under docs/results/campus-run, chart styled for the new dashboard.

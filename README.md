@@ -2,11 +2,12 @@
 
 **SIMULATION — NOT FOR REAL EMERGENCIES**
 
-A local Computer Networks lab prototype: persist a synthetic alert, send it over
-verified TLS/TCP, retry the same UUID after failures, and track a separate
-responder acknowledgment. No external APIs, emergency dispatch, GPS or cloud.
+A campus incident coordination web app: report a synthetic medical, fire, safety
+or infrastructure incident; assign a response team; record progress notes; and
+resolve it. The networking core preserves verified TLS/TCP, persistent queues,
+retry/restart recovery, deduplication and separate receipt/response states.
 
-![Observed sender acknowledgment](docs/screenshots/sender.png)
+![Campus dashboard with actual incident counts](docs/screenshots/campus/overview.png)
 
 ## Run locally
 
@@ -17,7 +18,7 @@ the repository root. Windows PowerShell:
 python -m venv .venv
 .\.venv\Scripts\python -m pip install -r requirements.txt
 .\.venv\Scripts\python scripts/init_demo.py
-.\.venv\Scripts\python scripts/run_demo.py --enable-demo-faults
+.\.venv\Scripts\python scripts/run_app.py --enable-demo-faults
 ```
 
 macOS/Linux (commands supplied; not executed on those hosts):
@@ -26,14 +27,18 @@ macOS/Linux (commands supplied; not executed on those hosts):
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
 .venv/bin/python scripts/init_demo.py
-.venv/bin/python scripts/run_demo.py --enable-demo-faults
+.venv/bin/python scripts/run_app.py --enable-demo-faults
 ```
 
-Open [sender](http://127.0.0.1:5001) and [responder](http://127.0.0.1:5002).
+Open **[SafeSignal](http://127.0.0.1:5000)**: one address with
+[sender](http://127.0.0.1:5000/sender/) and
+[responder](http://127.0.0.1:5000/responder/) dashboards.
 Use the corresponding sender_token / responder_token from generated,
 ignored local/config.json. Never project or publish that file. The web page
 does not contain backend tokens. Omit --enable-demo-faults to disable injection.
-Ctrl+C stops the three processes; interrupted submissions recover on restart.
+Ctrl+C stops the app; interrupted submissions recover on restart. Existing
+databases migrate without clearing records. The optional original separate-process
+CN lab launcher remains `scripts/run_demo.py`; never run both against one outbox.
 
 In this agent sandbox only, ensurepip/temporary paths can fail under the Unicode
 workspace path. Workaround using host pip:
@@ -44,7 +49,8 @@ Loopback tests require network access; do not disable TLS to bypass restrictions
 
 1. Send a LOW **synthetic** alert. It is committed to the sender outbox before
    transmission; observe SERVER_RECEIVED after server commit.
-2. Acknowledge in responder console. Sender polls to RESPONDER_ACKNOWLEDGED.
+2. Open an incident in the responder workspace. Assign a team and acknowledge,
+   start response, add a note, then resolve with a summary. Sender sees the updates.
 3. Set **Temporary sender disconnect**, submit, observe QUEUED. Reset Normal;
    worker retries the same UUID. Restart the demo to show disk persistence.
 4. Set **First application receipt lost**, submit. Server commits, closes without
@@ -53,6 +59,11 @@ Loopback tests require network access; do not disable TLS to bypass restrictions
    chosen fault schedule and observation window. NS2 is a separate experiment.
 
 [Full script, six-slide outline and viva](docs/demo-script.md).
+
+The Overview shows actual record counts, seven-day report volume, category
+distribution, response progress and live activity. Search and filters work on
+incidents. Use **Create 4 sample incidents** for a labeled synthetic walkthrough;
+it submits through the real outbox, never substitutes fake success counters.
 
 ## Tests and actual evidence
 
@@ -80,11 +91,11 @@ NS2 and Wireshark **not run on this host**. Parser fixture tests are synthetic.
 
 ```mermaid
 flowchart LR
-    B[Sender browser :5001] --> W[Flask + SQLite outbox + worker]
-    W -->|Verified TLS / TCP :9443| S[Socket server]
+    B[One browser origin :5000] --> W[Waitress + sender and responder Flask dashboards]
+    W --> Q[SQLite outbox + worker]
+    Q -->|Private verified TLS / TCP| S[Socket server]
     S --> D[(Server SQLite + audit)]
-    R[Responder browser :5002] --> F[Authenticated Flask adapter]
-    F -->|Role-authenticated TLS requests| S
+    W -->|Role-authenticated TLS requests| S
 ```
 
 ```mermaid
@@ -99,24 +110,39 @@ stateDiagram-v2
 connection; timeouts, field validation, bounded frames, role-scoped token rate
 limits. SQLite PRIMARY KEY and immutable-payload hash handle retransmission and
 ID conflicts. Server responds after transaction commit. Responder ACK is
-idempotent. Priority ordering and five-alert pages keep wire messages bounded.
+idempotent. Priority ordering and four-incident pages keep wire messages bounded.
 Backoff starts around 0.4–0.5s, caps at 30s, with jitter. One worker per outbox.
+
+Incident workflow (separate from transport): **REPORTED → ACKNOWLEDGED →
+IN_PROGRESS → RESOLVED**. Team assignment and notes are server-audited. Sender
+polling continues after acknowledgment until resolution; terminal state cannot
+regress. One authenticated demo response desk assigns synthetic response teams;
+this is not a multi-user institutional account system.
+
+## One hosted deployment
+
+The same app can run as one Python service with one public HTTPS address.
+[Deployment configuration and approval boundary](docs/hosting.md).
+`render.yaml` is prepared, but **no paid service or persistent disk has been
+created**. Hosting requires owner approval and account configuration.
 
 ## Configuration, retention and limits
 
-- All services bind 127.0.0.1; browser HTTP on loopback is a demo concession.
+- Local web and internal TCP services bind 127.0.0.1; browser HTTP on loopback is a demo concession.
   TLS socket clients always verify server certificate and hostname. This is
   server-authenticated TLS plus tokens, not mutual TLS or end-to-end encryption.
 - Certificate valid for 30 days. To renew while preserving tokens, stop the demo
   and run `python -c "from safesignal.tls import create_certificate; create_certificate('certs')"`.
+  The single app generates a private, per-process loopback TLS certificate at
+  startup with a ten-year validity; the public HTTPS certificate belongs to the host.
   Init preserves existing config. Private keys, databases, captures and secrets
   are Git-ignored. Development keys are unencrypted on local disk.
 - Optional SAFESIGNAL_SENDER_TOKEN, SAFESIGNAL_RESPONDER_TOKEN,
   SAFESIGNAL_SESSION_SECRET environment overrides. Generated local JSON is
   the default; .env.example documents settings, no automatic dotenv loader.
-- Session login, CSRF, escaped HTML, local Host validation, login throttling;
-  no production availability or security guarantee. Flask development servers
-  are for this local lab only. No at-rest encryption or multi-tenant claims.
+- Session login, CSRF, escaped HTML, explicit Host validation, login throttling;
+  no production availability or security guarantee. The single app uses Waitress;
+  the legacy lab uses Flask development servers. No at-rest encryption or multi-tenant claims.
 - Records persist until owner archives them. Stop all demo processes, then
   `python scripts/reset_demo.py`: moves demo databases into ignored
   local/archive-<UTC>/, preserving data; next start creates clean databases.

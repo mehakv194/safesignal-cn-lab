@@ -33,7 +33,7 @@ def export(directory, rows, config):
     for i, (policy, summary) in enumerate(summaries.items()):
         ratio = summary['delivery_ratio'] or 0
         y = 75 + i * 80
-        bars.append(f'<text x="20" y="{y}" fill="#d8e5f5">{policy}: {ratio:.1f}% stored</text><rect x="20" y="{y+12}" width="{ratio*5}" height="24" fill="#55baae"/>')
-    chart = '<svg xmlns="http://www.w3.org/2000/svg" width="600" height="280" viewBox="0 0 600 280"><rect width="600" height="280" fill="#131e2f"/><g font-family="sans-serif" font-size="15"><text x="20" y="30" fill="white">Observed unique server receipt ratio</text>' + ''.join(bars) + '<text x="20" y="255" fill="#b5c8dd">App faults only; this is not measured IP packet loss.</text></g></svg>'
+        bars.append(f'<text x="24" y="{y}" fill="#355c46">{policy.replace("_"," ")}: {ratio:.1f}% stored</text><rect x="24" y="{y+12}" width="500" height="24" rx="12" fill="#edf4ed"/><rect x="24" y="{y+12}" width="{ratio*5}" height="24" rx="12" fill="{["#18714f","#44bba6"][i]}"/>')
+    chart = '<svg xmlns="http://www.w3.org/2000/svg" width="600" height="280" viewBox="0 0 600 280"><rect width="600" height="280" rx="16" fill="#ffffff"/><g font-family="sans-serif" font-size="15"><text x="24" y="30" fill="#224b34">Observed unique server receipt ratio</text>' + ''.join(bars) + '<text x="24" y="255" fill="#718669" font-size="12">Application faults only; not measured IP packet loss.</text></g></svg>'
     (directory / 'comparison.svg').write_text(chart)
     return result

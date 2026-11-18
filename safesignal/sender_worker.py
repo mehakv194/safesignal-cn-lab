@@ -15,12 +15,14 @@ class Worker:
 
     def tick(self):
         for row in self.outbox.rows():
+            if self.stop.is_set():
+                return
             aid, state = row['alert_id'], row['status']
-            if state == 'RESPONDER_ACKNOWLEDGED':
+            if row['incident_state'] == 'RESOLVED':
                 continue
             if state == 'QUEUED' and not self.outbox.claim(aid):
                 continue
-            if state not in ('QUEUED', 'SERVER_RECEIVED'):
+            if state not in ('QUEUED', 'SERVER_RECEIVED','RESPONDER_ACKNOWLEDGED'):
                 continue
             try:
                 reply = self.call('SUBMIT_ALERT', row['alert']) if state == 'QUEUED' else self.call('GET_STATUS', {'alert_id': aid})

@@ -1,15 +1,17 @@
 # Five-minute synthetic demonstration
 
 Before class: run init_demo, tests, run_experiments, then
-`python scripts/run_demo.py --enable-demo-faults`. Open sender :5001 and responder
-:5002. Log in with the corresponding tokens in ignored local/config.json;
+`python scripts/run_app.py --enable-demo-faults`. Open http://127.0.0.1:5000;
+use /sender/ and /responder/ on that one address. Log in with the corresponding tokens in ignored local/config.json;
 do not project the token file. Use only the supplied synthetic descriptions.
 
 1. **0:00–0:35** Explain sender → verified TLS/TCP socket server → SQLite;
    browser HTTP stays on loopback. Distinguish server receipt and human ACK.
 2. **0:35–1:15** Normal preset. Submit LOW “TEST ONLY: synthetic campus alert”.
-   Observe local outbox then SERVER_RECEIVED. Responder acknowledges; observe
-   RESPONDER_ACKNOWLEDGED on sender. Open factual timeline.
+   Observe local outbox then SERVER_RECEIVED. Open the incident as responder;
+   assign a response team and acknowledge, start response, add a note and resolve
+   with a summary. Show sender progress and the actual dashboard counts/chart.
+   Transport acknowledgment and incident progress are separate states.
 3. **1:15–2:10** Set disconnect. Submit HIGH synthetic alert; it remains queued.
    Stop/restart sender if demonstrating crash recovery; leave the same SQLite
    files in place. Reset normal; observe retry of the same UUID.
@@ -30,7 +32,8 @@ do not project the token file. Use only the supplied synthetic descriptions.
 2. **Architecture:** browser adapters, worker/outbox, TLS sockets, central SQLite,
    responder. Server can read plaintext; encryption at rest not implemented.
 3. **Wire/state:** 4-byte length + bounded JSON; stable UUID;
-   QUEUED → SENDING → SERVER_RECEIVED → RESPONDER_ACKNOWLEDGED.
+   QUEUED → SENDING → SERVER_RECEIVED → RESPONDER_ACKNOWLEDGED for transport;
+   REPORTED → ACKNOWLEDGED → IN_PROGRESS → RESOLVED for incident response.
 4. **Reliability & security:** commit before receipt, payload hash conflict,
    dedup PRIMARY KEY, capped jittered backoff, role tokens, verified certificate,
    CSRF sessions, localhost default.

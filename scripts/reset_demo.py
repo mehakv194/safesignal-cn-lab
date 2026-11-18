@@ -17,7 +17,7 @@ def archive_databases(local):
 
 if __name__ == '__main__':
     root = Path(__file__).resolve().parents[1]
-    for port in (9443, 5001, 5002):
+    for port in (9443, 5000, 5001, 5002):
         with socket.socket() as sock:
             sock.settimeout(.5)
             if sock.connect_ex(('127.0.0.1', port)) == 0:

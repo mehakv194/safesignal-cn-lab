@@ -141,3 +141,63 @@ Publication CI completed successfully on both ubuntu-latest and windows-latest
 for implementation merge 732fed5. Dependencies installed from requirements.txt
 and python -m pytest -q succeeded on both. Thus Linux/Windows automated integration
 checks are now verified; macOS and multi-device LAN remain untested.
+
+## Campus coordination expansion — 18 November 2026
+
+User explicitly expanded the product from submit/acknowledge to campus incident
+coordination and requested a white dashboard with dark-green/turquoise accents.
+This supersedes the original UI scope, while preserving the CN transport core.
+
+Changes reach models, immutable payloads, server authorization/store/schema,
+outbox migration/polling, Flask routes/templates/static assets, CLI launchers,
+reset protection, aggregate charts, tests and deployment documentation.
+Medical/fire/safety/infrastructure categories; authenticated response desk assigns
+one of three synthetic teams, acknowledges, starts response, adds notes and
+resolves with a required summary. Invalid transitions and unauthorized updates
+are rejected; repeated ACK never reopens a resolved incident. Delivery state is
+separate from incident progress. Polling continues after ACK until RESOLVED.
+
+Schemas migrate additively; legacy payloads/hashes and UUIDs remain intact.
+Existing local databases backed up at local/backups/20261118T152521 before
+migration; records preserved, including existing user-entered reports. No demo
+records were silently cleared. Audit replies bounded to latest 8 events; incident
+pages to 4 records. Notes <=200 characters, category/severity/action validation,
+CSRF, escaped text and role restrictions retained.
+
+One application at http://127.0.0.1:5000 with /sender/ and /responder/; Waitress
+serves both while private verified TLS/TCP and one outbox worker run internally.
+Start: .venv/Scripts/python scripts/run_app.py --enable-demo-faults .
+Default root has role selection; hosted adapter requires HTTPS, secure cookies
+and explicit hosts. Source configuration render.yaml prepared only; paid hosting
+and disk have NOT been provisioned. Netlify draft files deferred into ignored
+local/deferred-netlify because user chose a single Python host.
+
+Dashboard uses real records for total/active/critical/resolved counts, seven-day
+UTC report chart, category bars, response-progress ring and recent activity.
+Search/filter/detail actions are functional. Explicit Create 4 sample incidents
+submits labeled synthetic records through the actual outbox. No invented growth,
+operators, artificial ticking counters or historical data. Shared response-desk
+principal and synthetic teams are not represented as separate authenticated people.
+
+Browser verified on one origin: sample creation; Medical Team assignment;
+acknowledge -> in progress -> note -> resolve; sender overview reflects resolution;
+evacuation drill left IN_PROGRESS; modal open/close; role navigation. Screenshots:
+docs/screenshots/campus/overview.png and resolved-incident.png. Desktop layout
+observed at native browser widths; no exact mobile viewport claim. Forms pause
+background DOM replacement while edited; dialog keyboard focus is native.
+
+Full loopback integration suite: 25 passed in 20.57s before final health/shutdown
+refinements; final result follows. Includes populated legacy server/outbox schema
+upgrades, immutable retransmission, invalid transitions, role authorization,
+Unicode frame/audit bounds, workflow and sender sync, HTTPS/cookie paths,
+combined runtime restart persistence, previous 19 regression checks.
+
+Final local full suite: **25 passed in 21.65s** after health/lifecycle shutdown
+refinements. Local server uses the final UI, updated evidence source and persistent
+databases. No paid resources created. Public hosting remains subject to approval.
+
+Final unavailable-data refinement: 3 web tests passed in 2.40s, including new
+responder outage behavior (503 with explicit unavailable message, no invented
+zero counts). Browser search, light evidence chart, same-origin navigation and
+report modal verified; browser error log empty. Exact mobile-device testing not
+performed. An additional outage test brings the suite to 26 tests (CI below).

@@ -53,10 +53,12 @@ class AlertServer(socketserver.ThreadingTCPServer):
                 token = ''
             role = next((r for r, t in self.tokens.items() if hmac.compare_digest(token.encode(), t.encode())), None)
             kind = req.get('type')
-            required = {'SUBMIT_ALERT': 'sender', 'GET_STATUS': 'sender',
+            required = {'SUBMIT_ALERT': 'sender', 'GET_STATUS': ('sender','responder'),
                         'LIST_ALERTS': 'responder', 'ACK_ALERT': 'responder',
-                        'GET_AUDIT': 'responder', 'HEALTH': 'sender'}
-            if role is None or required.get(kind) != role:
+                        'UPDATE_INCIDENT':'responder','DASHBOARD':'responder',
+                        'GET_AUDIT': ('sender','responder'), 'HEALTH': 'sender'}
+            permitted = required.get(kind, ())
+            if role is None or (role not in permitted if isinstance(permitted,tuple) else permitted != role):
                 return dict(status='ERROR', code='UNAUTHORIZED', request_id=rid)
             with self.rate_lock:
                 start, count = self.rates.get(role, (time.monotonic(), 0))
@@ -68,6 +70,10 @@ class AlertServer(socketserver.ThreadingTCPServer):
             payload = req.get('payload', {})
             if not isinstance(payload, dict):
                 raise ValueError()
+            if kind in ('GET_STATUS','GET_AUDIT','ACK_ALERT','UPDATE_INCIDENT'):
+                if not isinstance(payload.get('alert_id'),str):
+                    raise ValueError()
+                UUID(payload['alert_id'])
             if kind == 'HEALTH':
                 result = dict(status='OK', code='HEALTHY')
             elif kind == 'SUBMIT_ALERT':
@@ -79,9 +85,14 @@ class AlertServer(socketserver.ThreadingTCPServer):
                 if type(offset) is not int or offset < 0:
                     raise ValueError()
                 result = dict(status='OK', code='ALERTS', alerts=self.store.listing(
-                    offset, payload.get('severity', ''), payload.get('state', ''), payload.get('newest') is True))
+                    offset, payload.get('severity', ''), payload.get('state', ''), payload.get('newest') is True,
+                    payload.get('incident_state',''),payload.get('category',''),payload.get('search','')))
             elif kind == 'ACK_ALERT':
                 result = self.store.acknowledge(payload['alert_id'])
+            elif kind == 'UPDATE_INCIDENT':
+                result = self.store.update_incident(payload['alert_id'],payload['action'],payload.get('team',''),payload.get('note',''))
+            elif kind == 'DASHBOARD':
+                result = dict(status='OK',code='DASHBOARD', **self.store.dashboard())
             else:
                 result = dict(status='OK', code='AUDIT', events=self.store.audit(payload['alert_id']))
             return dict(result, request_id=rid)

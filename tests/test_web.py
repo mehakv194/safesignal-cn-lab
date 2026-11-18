@@ -50,3 +50,15 @@ def test_login_throttle_and_disabled_simulation(tmp_path):
     login(other, 'sender')
     assert other.post('/simulation', data={'csrf': csrf(other), 'preset': 'disconnect'}).status_code == 403
     assert other.get('/evidence').status_code == 200
+
+
+def test_responder_outage_does_not_display_invented_zero_counts():
+    config=dict(session_secret='test-only',sender_token='sender',responder_token='responder')
+    def offline(*args):
+        raise ConnectionError()
+    client=create_app('responder',config,offline).test_client()
+    login(client,'responder')
+    response=client.get('/')
+    assert response.status_code==503
+    assert 'Live incident data cannot be confirmed' in response.get_data(as_text=True)
+    assert 'Total incidents' not in response.get_data(as_text=True)
