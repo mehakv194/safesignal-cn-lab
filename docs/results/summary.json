@@ -1,0 +1,33 @@
+{
+  "run_id": "20261118T140908885117",
+  "seed": 7,
+  "count": 6,
+  "observation_seconds": 2,
+  "date_utc": "2026-11-18T14:09:11.227787+00:00",
+  "percentile": "nearest rank",
+  "scenario": "Repeated disconnect, lost first app receipt, normal; per-alert observation window",
+  "policies": {
+    "single_attempt": {
+      "total": 6,
+      "received": 4,
+      "delivery_ratio": 66.66666666666666,
+      "confirmed": 2,
+      "pending_confirmation": 4,
+      "median_confirmation_seconds": 0.025263250106945634,
+      "p95_confirmation_seconds": 0.03258860018104315,
+      "retries": 0,
+      "duplicate_suppressions": 0
+    },
+    "retry_dedup": {
+      "total": 6,
+      "received": 6,
+      "delivery_ratio": 100.0,
+      "confirmed": 6,
+      "pending_confirmation": 0,
+      "median_confirmation_seconds": 0.2577403500908986,
+      "p95_confirmation_seconds": 0.2844664000440389,
+      "retries": 4,
+      "duplicate_suppressions": 2
+    }
+  }
+}

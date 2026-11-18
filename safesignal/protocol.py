@@ -26,7 +26,7 @@ def receive(sock):
 
 
 def send(sock, obj):
-    data = json.dumps(obj, allow_nan=False).encode('utf-8')
+    data = json.dumps(obj, allow_nan=False, ensure_ascii=False).encode('utf-8')
     if not 0 < len(data) <= MAX_FRAME:
         raise ValueError('Invalid frame size')
     sock.sendall(struct.pack('!I', len(data)) + data)

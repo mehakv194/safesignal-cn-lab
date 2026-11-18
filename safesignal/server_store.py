@@ -58,9 +58,12 @@ class Store:
                     server_received_at=row['server_received_at'],
                     responder_acknowledged_at=row['responder_acknowledged_at'])
 
-    def listing(self):
+    def listing(self, offset=0):
         with self.connect() as db:
-            ids = db.execute('SELECT alert_id FROM alerts ORDER BY server_received_at DESC LIMIT 100').fetchall()
+            ids = db.execute('''SELECT alert_id FROM alerts ORDER BY
+                CASE json_extract(payload,'$.severity') WHEN 'CRITICAL' THEN 0
+                WHEN 'HIGH' THEN 1 WHEN 'MEDIUM' THEN 2 ELSE 3 END,
+                server_received_at LIMIT 5 OFFSET ?''', (offset,)).fetchall()
         return [self.status(row[0]) for row in ids]
 
     def acknowledge(self, aid):

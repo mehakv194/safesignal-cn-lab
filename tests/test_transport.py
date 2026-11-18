@@ -72,3 +72,10 @@ def test_fragmented_frame():
             del self.data[:1]
             return value
     assert protocol.receive(Fragmented()) == {'x': 1}
+
+
+def test_pagination_with_maximum_unicode_fields(lab):
+    for _ in range(6):
+        assert lab[2]('SUBMIT_ALERT', new_alert('LOW', '🚦' * 300, '🚦' * 120))['status'] == 'OK'
+    assert len(lab[2]('LIST_ALERTS', token='test-responder')['alerts']) == 5
+    assert len(lab[2]('LIST_ALERTS', {'offset': 5}, 'test-responder')['alerts']) == 1

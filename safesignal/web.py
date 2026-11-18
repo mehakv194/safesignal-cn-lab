@@ -2,12 +2,13 @@ import hmac
 import secrets
 import time
 
-from flask import Flask, abort, redirect, render_template, request, session, url_for
+from flask import Flask, abort, redirect, render_template, request, session, url_for, send_from_directory
+from pathlib import Path
 
 from .models import SEVERITIES, new_alert
 
 
-def create_app(role, config, call, outbox=None):
+def create_app(role, config, call, outbox=None, faults=None):
     app = Flask(__name__)
     app.config.update(SECRET_KEY=config['session_secret'], MAX_CONTENT_LENGTH=8192,
                       SESSION_COOKIE_NAME='safesignal_' + role,
@@ -62,7 +63,8 @@ def create_app(role, config, call, outbox=None):
                 for row in rows:
                     row['timeline'] = outbox.timeline(row['alert_id'])
             else:
-                reply = call('LIST_ALERTS')
+                offset = max(0, int(request.args.get('offset', '0')))
+                reply = call('LIST_ALERTS', {'offset': offset})
                 if reply['status'] != 'OK':
                     raise ValueError('Backend rejected request')
                 rows = reply['alerts']
@@ -70,7 +72,37 @@ def create_app(role, config, call, outbox=None):
                 rows = [dict(r, alert=r, status=r['code'], timeline=call('GET_AUDIT', {'alert_id': r['alert_id']}).get('events', [])) for r in rows]
         except (OSError, EOFError, ValueError):
             rows, error = [], 'TLS backend unavailable. Saved sender alerts remain on disk.'
-        return render_template('home.html', role=role, rows=rows, error=error, severities=SEVERITIES)
+        return render_template('home.html', role=role, rows=rows, error=error, severities=SEVERITIES,
+                               faults=faults, preset=faults.preset() if faults else 'normal',
+                               offset=request.args.get('offset', '0'))
+
+    @app.post('/simulation')
+    def simulation():
+        if role != 'sender' or not faults or not faults.enabled:
+            abort(403)
+        try:
+            faults.set(request.form.get('preset'))
+        except ValueError:
+            abort(400)
+        return redirect(url_for('home'))
+
+    @app.get('/evidence')
+    def evidence():
+        import json
+        path = Path('artifacts/latest.json')
+        report = json.loads(path.read_text()) if path.exists() else None
+        return render_template('evidence.html', role=role, report=report)
+
+    @app.get('/evidence/<filename>')
+    def evidence_file(filename):
+        if filename not in ('results.csv', 'summary.json', 'comparison.svg'):
+            abort(404)
+        import json
+        path = Path('artifacts/latest.json')
+        if not path.exists():
+            abort(404)
+        run_id = json.loads(path.read_text())['run_id']
+        return send_from_directory(Path('artifacts').resolve() / run_id, filename)
 
     @app.post('/submit')
     def submit():
