@@ -9,7 +9,6 @@ import threading
 
 from flask import Flask, jsonify, render_template
 from werkzeug.middleware.dispatcher import DispatcherMiddleware
-from werkzeug.middleware.proxy_fix import ProxyFix
 
 from .faults import Faults
 from .sender_store import Outbox
@@ -103,9 +102,10 @@ def main():
     config['ephemeral_storage'] = os.environ.get('SAFESIGNAL_EPHEMERAL_STORAGE')=='1'
     data_dir = os.environ['SAFESIGNAL_DATA_DIR']
     with hosted_runtime(config, data_dir, os.environ.get('ENABLE_DEMO_FAULTS') == '1') as app:
-        # Render's HTTPS ingress overwrites forwarded scheme; never trust forwarded host.
-        serve(ProxyFix(app, x_for=0, x_proto=1, x_host=0, x_port=0, x_prefix=0),
-              host='0.0.0.0', port=int(os.environ.get('PORT', '10000')), threads=8)
+        # Only Render ingress reaches this listener. Trust its scheme, never forwarded host.
+        serve(app,host='0.0.0.0',port=int(os.environ.get('PORT','10000')),threads=8,
+              trusted_proxy='*',trusted_proxy_count=1,
+              trusted_proxy_headers={'x-forwarded-proto'})
 
 
 if __name__ == '__main__':
