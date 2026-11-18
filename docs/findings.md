@@ -6,10 +6,11 @@ Windows / PowerShell; Python 3.13.9. Existing Git repository on unborn `master`,
 no code or commits. All five source Markdown files and original DOCX read.
 Original synopsis retained under ignored `starter/` because it includes enrollment
 numbers. No existing user code changed. pytest present; Flask/cryptography absent
-initially. NS2, OpenSSL and Wireshark not on PATH. GitHub CLI installed but saved
-authentication invalid: publication blocked until owner runs `gh auth login`.
+initially. NS2, OpenSSL and Wireshark not on PATH. GitHub CLI authentication
+initially failed under the restricted sandbox. A later network-enabled check
+succeeded after login handoff; account mehakv194.
 
-User approved MIT licensing and publication after checks pass. No publication yet.
+User approved MIT licensing and publication after checks pass.
 Virtual environment ensurepip failed on this Unicode workspace path; installing
 through host pip's `--python .venv/Scripts/python.exe` works around bootstrap.
 
@@ -86,3 +87,21 @@ Chart and metrics visibly rendered in browser. No private data in screenshots.
 
 ## Phase 5
 Chaos/evidence commit 6308529 merged; 15 tests passed in 11.88s including maximum Unicode payload pagination. Independent four-node NS2 TCL scenarios and strict legacy wired-trace parser added. Parser synthetic fixture: 1 passed in 0.09s. NS2 executable unavailable, so simulation NOT RUN; no trace values claimed. Wireshark instructions added, capture NOT RUN. Verified legacy trace format against official NS2 documentation.
+
+## Phase 6
+
+Network-lab commit d0c83e6 merged. Added validated responder severity/state/newest
+filters, connectivity observation, retention/archive command, six-slide outline,
+viva/demo script, Windows/Linux CI workflow, exact setup/config/renewal guidance.
+Fresh venv local/qa-venv: standard python -m venv succeeded with tool network
+access; pinned dependency install succeeded. Full suite: **19 passed in 13.33s**
+in that new environment, including final non-destructive archive test.
+Actual abrupt child-process exit (os._exit) leaves committed in-flight queue
+record; next worker recovers and submits. Reset refuses while services active;
+archive preserves bytes and credentials. macOS/Linux and CI not yet executed.
+
+Final browser check on restarted processes: lost app receipt caused 2 attempts,
+one server row, one duplicate suppression; reset normal. PNG chart download
+successfully saved from browser and copied to docs/results/comparison.png.
+Sender/responder screenshots updated. Services left running locally for review.
+No 1366x768 exact-size validation claim; browser used native viewport.

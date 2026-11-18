@@ -71,3 +71,23 @@ def test_no_terminal_regression(tmp_path):
     box.confirmed(p['alert_id'], reply)
     box.confirmed(p['alert_id'], dict(reply, code='SERVER_RECEIVED'))
     assert box.rows()[0]['status'] == 'RESPONDER_ACKNOWLEDGED'
+
+
+def test_abrupt_sender_process_exit_preserves_inflight(lab, tmp_path):
+    path = tmp_path / 'crashed.sqlite'
+    code = '''
+import os, sys
+from safesignal.sender_store import Outbox
+from safesignal.models import new_alert
+b = Outbox(sys.argv[1])
+p = new_alert('HIGH', 'TEST ONLY: abrupt sender process exit')
+b.enqueue(p)
+assert b.claim(p['alert_id'])
+os._exit(23)
+'''
+    crashed = subprocess.run([sys.executable, '-c', code, str(path)])
+    assert crashed.returncode == 23
+    box = Outbox(path)
+    assert box.rows()[0]['status'] == 'SENDING'
+    Worker(box, lab[2]).tick()
+    assert box.rows()[0]['status'] == 'SERVER_RECEIVED'

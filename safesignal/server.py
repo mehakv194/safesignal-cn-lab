@@ -78,7 +78,8 @@ class AlertServer(socketserver.ThreadingTCPServer):
                 offset = payload.get('offset', 0)
                 if type(offset) is not int or offset < 0:
                     raise ValueError()
-                result = dict(status='OK', code='ALERTS', alerts=self.store.listing(offset))
+                result = dict(status='OK', code='ALERTS', alerts=self.store.listing(
+                    offset, payload.get('severity', ''), payload.get('state', ''), payload.get('newest') is True))
             elif kind == 'ACK_ALERT':
                 result = self.store.acknowledge(payload['alert_id'])
             else:

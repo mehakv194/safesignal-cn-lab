@@ -4,6 +4,7 @@
 <p>{{ 'Save locally. Transmit securely. Track each acknowledgment.' if role == 'sender' else 'Synthetic incoming alerts, ordered by severity.' }}</p></div>
 <form action="/logout" method="post"><input type="hidden" name="csrf" value="{{ session.csrf }}"><button class="secondary">Sign out</button></form></div>
 {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+<p class="muted">Last page check: TLS backend {{ 'reachable' if reachable else 'unavailable (or simulated offline)' }} · <a href="/evidence">Evidence Lab</a></p>
 <div class="layout">
 {% if role == 'sender' %}<section class="panel compose"><div class="eyebrow">01 / NEW SYNTHETIC ALERT</div><h2>Send a test signal</h2>
 <form action="/submit" method="post"><input type="hidden" name="csrf" value="{{ session.csrf }}">
@@ -13,12 +14,15 @@
 <p class="muted">Saved to the local outbox before any network attempt.</p><button>Save test SOS locally →</button></form>
 <hr><div class="eyebrow">NETWORK CHAOS LAB</div><p class="muted">Application fault injection, not packet-loss emulation.</p>
 {% if faults and faults.enabled %}<form action="/simulation" method="post"><input type="hidden" name="csrf" value="{{ session.csrf }}">
-<label>Active simulation: {{ preset }}<select name="preset"><option value="normal">Normal / Reset</option><option value="delay">High app latency · 1500 ms</option><option value="ack_lost">First application receipt lost</option><option value="disconnect">Temporary sender disconnect</option></select></label><button class="secondary">Apply simulation</button></form>
+<label>Active simulation: {{ preset }}<select name="preset">{% for value,label in [('normal','Normal / Reset'),('delay','High app latency · 1500 ms'),('ack_lost','First application receipt lost'),('disconnect','Temporary sender disconnect')] %}<option value="{{ value }}"{% if preset == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label><button class="secondary">Apply simulation</button></form>
 {% else %}<p class="muted">Disabled. Start with --enable-demo-faults to use.</p>{% endif %}
 <p><a href="/evidence">Open Evidence Lab →</a></p></section>{% endif %}
 <section class="panel journey"><div class="eyebrow">{{ '02 / PERSISTED OUTBOX' if role == 'sender' else 'INCOMING SIGNALS' }}</div>
 <div class="section-title"><h2>{{ 'Alert journey' if role == 'sender' else 'Alert queue' }}</h2><a href="/">Refresh</a></div>
 <p class="muted">Updates every 3 seconds. Timestamps are UTC. Server received ≠ responder acknowledged.</p>
+{% if role == 'responder' %}<form method="get" class="filters"><label>Severity<select name="severity"><option value="">All severities</option>{% for s in severities %}<option{% if request.args.get('severity') == s %} selected{% endif %}>{{ s }}</option>{% endfor %}</select></label>
+<label>State<select name="state"><option value="">All states</option>{% for s in ['SERVER_RECEIVED','RESPONDER_ACKNOWLEDGED'] %}<option{% if request.args.get('state') == s %} selected{% endif %}>{{ s }}</option>{% endfor %}</select></label>
+<label>Order<select name="newest"><option value="0">Priority, then oldest</option><option value="1"{% if request.args.get('newest') == '1' %} selected{% endif %}>Newest first</option></select></label><button class="secondary">Filter</button></form>{% endif %}
 <div id="live" aria-live="polite">
 <div class="stats"><div><strong>{{ rows|length }}</strong><span>Visible alerts</span></div><div><strong>{{ rows|selectattr('status','equalto','RESPONDER_ACKNOWLEDGED')|list|length }}</strong><span>Acknowledged</span></div>
 {% if role == 'sender' %}{% set counters=namespace(retries=0,duplicates=0) %}{% for row in rows %}{% set counters.retries=counters.retries + [0,row.attempt_count-1]|max %}{% set counters.duplicates=counters.duplicates + (row.timeline|selectattr('event','equalto','DUPLICATE_SUPPRESSED')|list|length) %}{% endfor %}<div><strong>{{ counters.retries }}</strong><span>App retries</span></div><div><strong>{{ counters.duplicates }}</strong><span>Duplicates suppressed</span></div>{% endif %}</div>
@@ -31,6 +35,6 @@
 {% if role == 'responder' and row.status != 'RESPONDER_ACKNOWLEDGED' %}<form action="/ack/{{ row.alert_id }}" method="post"><input type="hidden" name="csrf" value="{{ session.csrf }}"><button>Acknowledge test alert</button></form>{% endif %}
 {% if role == 'sender' and row.status == 'QUEUED' %}<form action="/retry/{{ row.alert_id }}" method="post"><input type="hidden" name="csrf" value="{{ session.csrf }}"><button class="secondary">Retry now · same UUID</button></form>{% endif %}
 </article>{% else %}<div class="empty"><h3>No signals yet</h3><p>{{ 'Create a synthetic alert to begin the journey.' if role == 'sender' else 'New test alerts will appear here.' }}</p></div>{% endfor %}</div>
-{% if role == 'responder' %}<nav><a href="/?offset={{ [0, offset|int - 5]|max }}">Previous</a> · <a href="/?offset={{ offset|int + 5 }}">Next 5 alerts</a></nav>{% endif %}
+{% if role == 'responder' %}<nav><a href="{{ url_for('home',offset=[0,offset|int-5]|max,severity=request.args.get('severity',''),state=request.args.get('state',''),newest=request.args.get('newest','0')) }}">Previous</a> · <a href="{{ url_for('home',offset=offset|int+5,severity=request.args.get('severity',''),state=request.args.get('state',''),newest=request.args.get('newest','0')) }}">Next 5 alerts</a></nav>{% endif %}
 </section></div>
 {% endblock %}

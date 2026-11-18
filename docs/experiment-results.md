@@ -37,3 +37,8 @@ web CSRF/XSS protections, guarded latency and actual experiment export.
 NS2 and Wireshark: **NOT RUN**; executables unavailable on PATH. No trace,
 packet-loss or NS2 throughput results are claimed. Independent instructions in
 `ns2/README.md` and `docs/wireshark.md`.
+
+Final QA: fresh virtual environment, **19 passed in 13.33s**. Includes actual
+abrupt sender-process exit and recovery, maximum Unicode frame pagination,
+validated filters, login throttle and non-destructive database archiving.
+PNG chart export verified through browser: docs/results/comparison.png.

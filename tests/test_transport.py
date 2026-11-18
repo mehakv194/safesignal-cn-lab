@@ -79,3 +79,5 @@ def test_pagination_with_maximum_unicode_fields(lab):
         assert lab[2]('SUBMIT_ALERT', new_alert('LOW', '🚦' * 300, '🚦' * 120))['status'] == 'OK'
     assert len(lab[2]('LIST_ALERTS', token='test-responder')['alerts']) == 5
     assert len(lab[2]('LIST_ALERTS', {'offset': 5}, 'test-responder')['alerts']) == 1
+    assert lab[2]('LIST_ALERTS', {'severity': 'HIGH'}, 'test-responder')['alerts'] == []
+    assert lab[2]('LIST_ALERTS', {'severity': 'INVALID'}, 'test-responder')['code'] == 'INVALID_REQUEST'

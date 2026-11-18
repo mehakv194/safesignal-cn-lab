@@ -1,5 +1,3 @@
-import re
-
 from safesignal.models import new_alert
 from safesignal.sender_store import Outbox
 from safesignal.web import create_app
@@ -40,3 +38,15 @@ def test_web_auth_csrf_and_escaping(lab, tmp_path):
     assert p['alert_id'] in responder.get('/').get_data(as_text=True)
     assert responder.post('/ack/' + p['alert_id'], data={'csrf': csrf(responder)}).status_code == 302
     assert lab[2]('GET_STATUS', {'alert_id': p['alert_id']})['code'] == 'RESPONDER_ACKNOWLEDGED'
+
+
+def test_login_throttle_and_disabled_simulation(tmp_path):
+    config = dict(session_secret='test-only', sender_token='sender', responder_token='responder')
+    client = create_app('sender', config, lambda *args: {}, Outbox(tmp_path / 'outbox.sqlite')).test_client()
+    for _ in range(10):
+        assert login(client, 'wrong').status_code == 200
+    assert login(client, 'wrong').status_code == 429
+    other = create_app('sender', config, lambda *args: {}, Outbox(tmp_path / 'other.sqlite')).test_client()
+    login(other, 'sender')
+    assert other.post('/simulation', data={'csrf': csrf(other), 'preset': 'disconnect'}).status_code == 403
+    assert other.get('/evidence').status_code == 200
