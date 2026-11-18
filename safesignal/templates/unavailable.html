@@ -1,0 +1,3 @@
+{% extends 'base.html' %}{% from 'icons.html' import icon %}{% block content %}
+<div class="page-heading"><div><div class="eyebrow">CONNECTION INTERRUPTED</div><h1>We'll pick up where we left off.</h1><p>The incident server is currently unavailable.</p></div></div><section class="panel empty">{{ icon('pulse') }}<h2>Live incident data cannot be confirmed</h2><p class="muted">Saved reports remain on disk. Refresh when the connection returns; an unconfirmed update may need checking before retrying.</p><p class="muted"><a class="button secondary" href="{{ url_for('home') }}">Try again</a></p></section>
+{% endblock %}

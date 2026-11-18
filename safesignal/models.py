@@ -2,6 +2,9 @@ from datetime import datetime, timezone, timedelta
 from uuid import UUID, uuid4
 
 SEVERITIES = ('CRITICAL', 'HIGH', 'MEDIUM', 'LOW')
+CATEGORIES = ('MEDICAL', 'FIRE', 'SAFETY', 'INFRASTRUCTURE')
+INCIDENT_STATES = ('REPORTED', 'ACKNOWLEDGED', 'IN_PROGRESS', 'RESOLVED')
+RESPONSE_TEAMS = ('Campus Safety', 'Medical Team', 'Facilities Team')
 
 
 def now():
@@ -10,16 +13,20 @@ def now():
 
 def validate_alert(p):
     fields = {'alert_id', 'severity', 'description', 'location', 'created_at'}
-    if not isinstance(p, dict) or set(p) != fields:
+    if not isinstance(p, dict) or not fields <= set(p) or set(p) - fields - {'category'}:
         raise ValueError('Invalid alert fields')
     if any(not isinstance(v, str) for v in p.values()):
         raise ValueError('String fields required')
     for value in p.values():
         value.encode('utf-8')
+        if any(ord(c)<32 and c not in '\n\r\t' for c in value):
+            raise ValueError('Unsupported control character')
     if str(UUID(p['alert_id'])) != p['alert_id']:
         raise ValueError('Canonical UUID required')
     if p['severity'] not in SEVERITIES:
         raise ValueError('Invalid severity')
+    if p.get('category', 'SAFETY') not in CATEGORIES:
+        raise ValueError('Invalid incident category')
     if not 10 <= len(p['description'].strip()) <= 300 or len(p['location']) > 120:
         raise ValueError('Invalid description or location length')
     created = datetime.fromisoformat(p['created_at'])
@@ -30,6 +37,6 @@ def validate_alert(p):
     return p
 
 
-def new_alert(severity, description, location=''):
+def new_alert(severity, description, location='', category='SAFETY'):
     return validate_alert(dict(alert_id=str(uuid4()), severity=severity,
-                               description=description, location=location, created_at=now()))
+                               description=description, location=location, category=category, created_at=now()))

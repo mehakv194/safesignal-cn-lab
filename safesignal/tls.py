@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 
-def create_certificate(directory):
+def create_certificate(directory, valid_days=30):
     from cryptography import x509
     from cryptography.hazmat.primitives import hashes, serialization
     from cryptography.hazmat.primitives.asymmetric import rsa
@@ -19,7 +19,7 @@ def create_certificate(directory):
     cert = (x509.CertificateBuilder().subject_name(name).issuer_name(name)
             .public_key(key.public_key()).serial_number(x509.random_serial_number())
             .not_valid_before(stamp - timedelta(minutes=1))
-            .not_valid_after(stamp + timedelta(days=30))
+            .not_valid_after(stamp + timedelta(days=valid_days))
             .add_extension(x509.SubjectAlternativeName([
                 x509.DNSName('localhost'), x509.IPAddress(ipaddress.ip_address('127.0.0.1'))]), False)
             .sign(key, hashes.SHA256()))

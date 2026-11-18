@@ -9,4 +9,6 @@ certs/
 local/
 starter/
 artifacts/
+.netlify/
+netlify-public/
 *.pcap*

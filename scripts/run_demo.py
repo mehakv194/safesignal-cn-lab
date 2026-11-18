@@ -4,6 +4,7 @@ from pathlib import Path
 import subprocess
 import sys
 import time
+import socket
 
 
 if __name__ == '__main__':
@@ -12,6 +13,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--enable-demo-faults', action='store_true')
     args = parser.parse_args()
+    with socket.socket() as sock:
+        sock.settimeout(.3)
+        if sock.connect_ex(('127.0.0.1',5000))==0:
+            raise SystemExit('Stop the single campus app before starting the separate-process lab demo.')
     os.environ['ENABLE_DEMO_FAULTS'] = '1' if args.enable_demo_faults else '0'
     if args.enable_demo_faults:
         Path('local/faults.json').write_text('{"preset":"normal"}')

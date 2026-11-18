@@ -1,0 +1,27 @@
+# Review the paid service/disk estimate in Render before creating this blueprint.
+services:
+  - type: web
+    name: safesignal-campus
+    runtime: python
+    plan: starter
+    numInstances: 1
+    buildCommand: pip install -r requirements-hosted.txt
+    startCommand: python -m safesignal.hosted
+    healthCheckPath: /healthz
+    disk:
+      name: safesignal-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.9
+      - key: SAFESIGNAL_DATA_DIR
+        value: /var/data
+      - key: SAFESIGNAL_SENDER_TOKEN
+        sync: false
+      - key: SAFESIGNAL_RESPONDER_TOKEN
+        sync: false
+      - key: SAFESIGNAL_SESSION_SECRET
+        sync: false
+      - key: ENABLE_DEMO_FAULTS
+        value: '0'

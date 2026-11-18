@@ -2,7 +2,7 @@ import json
 import sqlite3
 import time
 
-from .models import now, validate_alert
+from .models import now, validate_alert, INCIDENT_STATES
 
 
 class Outbox:
@@ -20,6 +20,14 @@ class Outbox:
                 CREATE TABLE IF NOT EXISTS journey (
                     id INTEGER PRIMARY KEY, alert_id TEXT, event TEXT, recorded_at TEXT);
             ''')
+            columns = {r[1] for r in db.execute('PRAGMA table_info(outbox)')}
+            for name,definition in {
+                'incident_state':"TEXT NOT NULL DEFAULT 'REPORTED'",'assigned_to':"TEXT NOT NULL DEFAULT ''",
+                'assigned_team':"TEXT NOT NULL DEFAULT ''",'last_note':"TEXT NOT NULL DEFAULT ''",'resolved_at':'TEXT',
+            }.items():
+                if name not in columns:
+                    db.execute(f'ALTER TABLE outbox ADD COLUMN {name} {definition}')
+            db.execute("UPDATE outbox SET incident_state='ACKNOWLEDGED' WHERE status='RESPONDER_ACKNOWLEDGED' AND incident_state='REPORTED'")
 
     def connect(self):
         db = sqlite3.connect(self.path, timeout=5)
@@ -57,15 +65,24 @@ class Outbox:
     def confirmed(self, aid, reply):
         state = 'RESPONDER_ACKNOWLEDGED' if reply['code'] == 'RESPONDER_ACKNOWLEDGED' else 'SERVER_RECEIVED'
         with self.connect() as db:
-            row = db.execute('SELECT status FROM outbox WHERE alert_id=?', (aid,)).fetchone()
-            if row is None or row[0] == 'RESPONDER_ACKNOWLEDGED':
+            row = db.execute('SELECT * FROM outbox WHERE alert_id=?', (aid,)).fetchone()
+            if row is None:
+                return
+            if row['status']=='RESPONDER_ACKNOWLEDGED':
+                state = row['status']
+            progress = reply.get('incident_state','ACKNOWLEDGED' if state=='RESPONDER_ACKNOWLEDGED' else 'REPORTED')
+            if progress not in INCIDENT_STATES or INCIDENT_STATES.index(progress)<INCIDENT_STATES.index(row['incident_state']):
                 return
             db.execute('UPDATE outbox SET status=?,server_received_at=?,responder_acknowledged_at=?,last_error=NULL WHERE alert_id=?',
                        (state, reply['server_received_at'], reply.get('responder_acknowledged_at'), aid))
-            if row[0] != state:
+            db.execute('UPDATE outbox SET incident_state=?,assigned_to=?,assigned_team=?,last_note=?,resolved_at=? WHERE alert_id=?',
+                       (progress,reply.get('assigned_to',row['assigned_to']),reply.get('assigned_team',row['assigned_team']),reply.get('last_note',row['last_note']),reply.get('resolved_at',row['resolved_at']),aid))
+            if row['status'] != state:
                 db.execute('INSERT INTO journey(alert_id,event,recorded_at) VALUES (?,?,?)', (aid, state, now()))
                 if reply.get('duplicate'):
                     db.execute('INSERT INTO journey(alert_id,event,recorded_at) VALUES (?,?,?)', (aid, 'DUPLICATE_SUPPRESSED', now()))
+            if row['incident_state'] != progress and progress in ('IN_PROGRESS','RESOLVED'):
+                db.execute('INSERT INTO journey(alert_id,event,recorded_at) VALUES (?,?,?)',(aid,progress,now()))
 
     def retry_now(self, aid):
         with self.connect() as db:
