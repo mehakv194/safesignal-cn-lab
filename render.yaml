@@ -1,27 +1,25 @@
-# Review the paid service/disk estimate in Render before creating this blueprint.
+# Free-only demo: SQLite is ephemeral and may reset on restarts. No paid disk/database.
 services:
   - type: web
     name: safesignal-campus
     runtime: python
-    plan: starter
+    plan: free
     numInstances: 1
     buildCommand: pip install -r requirements-hosted.txt
     startCommand: python -m safesignal.hosted
     healthCheckPath: /healthz
-    disk:
-      name: safesignal-data
-      mountPath: /var/data
-      sizeGB: 1
     envVars:
       - key: PYTHON_VERSION
         value: 3.13.9
       - key: SAFESIGNAL_DATA_DIR
-        value: /var/data
+        value: /tmp/safesignal
       - key: SAFESIGNAL_SENDER_TOKEN
-        sync: false
+        generateValue: true
       - key: SAFESIGNAL_RESPONDER_TOKEN
-        sync: false
+        generateValue: true
       - key: SAFESIGNAL_SESSION_SECRET
-        sync: false
+        generateValue: true
+      - key: SAFESIGNAL_EPHEMERAL_STORAGE
+        value: '1'
       - key: ENABLE_DEMO_FAULTS
         value: '0'

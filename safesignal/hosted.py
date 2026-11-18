@@ -61,7 +61,7 @@ def hosted_runtime(config, data_dir, enable_faults=False):
 
             @root.get('/')
             def home():
-                response = root.make_response(render_template('welcome.html'))
+                response = root.make_response(render_template('welcome.html',ephemeral_storage=settings.get('ephemeral_storage',False)))
                 response.headers['Cache-Control']='no-store'
                 return response
 
@@ -100,6 +100,7 @@ def main():
     if not hosts:
         raise ValueError('Configure explicit SAFESIGNAL_ALLOWED_HOSTS')
     config['allowed_hosts'] = tuple(hosts)
+    config['ephemeral_storage'] = os.environ.get('SAFESIGNAL_EPHEMERAL_STORAGE')=='1'
     data_dir = os.environ['SAFESIGNAL_DATA_DIR']
     with hosted_runtime(config, data_dir, os.environ.get('ENABLE_DEMO_FAULTS') == '1') as app:
         # Render's HTTPS ingress overwrites forwarded scheme; never trust forwarded host.

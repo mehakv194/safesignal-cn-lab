@@ -206,3 +206,25 @@ Campus feature commit 155b629 merged after successful CI:
 https://github.com/mehakv194/safesignal-cn-lab/actions/runs/44341259585 .
 Both Windows and Ubuntu jobs passed all 26 tests. Staged public-content scan of
 74 files passed; private/generated data excluded. No paid resources created.
+
+## Free-only hosting decision — 18 November 2026
+
+User requires only free plans and subsequently rejected Supabase/any separate
+cloud database. No Supabase project or database was created; existing projects
+were not changed. The newest instruction replaces the earlier cloud-database
+choice. Render plan changed from Starter to Free; paid disk removed entirely.
+Only built-in SQLite under /tmp/safesignal remains. Three demo secrets generated
+by the provider; values never enter Git or browser source. No billing enabled.
+
+Explicit tradeoff disclosed: the provider address is stable while the service
+exists, but a free instance can sleep and its SQLite files can reset on restart.
+This does NOT satisfy cross-restart hosted persistence. The UI and hosting guide
+state that limitation; local laptop SQLite persistence is unchanged.
+
+Interactive Render sign-in is required. Current handoff is on GitHub's login
+page for Render. No public deployment or permanent URL claimed yet.
+
+Free-only release checks: **27 passed in 20.99s**. Plan/disk regression check
+asserts plan: free and no disk stanza; ephemeral-retention notice verified.
+Owner completed sign-in; Render workspace dashboard observed authenticated.
+Proceed only with Free/$0 service. No separate database service will be used.
