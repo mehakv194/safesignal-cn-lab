@@ -33,3 +33,18 @@ future skew, use stable UUID/payload hashes for replay safety.
 - Phase 4: guarded faults and measured CSV/chart experiment.
 - Phase 5: independent NS2/Wireshark instructions, no invented results.
 - Phase 6: complete checks and demo documentation, publish only with working auth.
+
+## Phase 0 / Phase 1
+
+Skeleton commit `da92830`; package import smoke passed. Transport implemented with
+bounded exact framing, verified localhost certificate, role tokens, validation,
+SQLite commit-before-receipt, dedup/conflict and idempotent responder acknowledgment.
+Some shared store/status functionality landed early because the same transaction
+paths are exercised by transport acceptance checks.
+
+Command: `.venv/Scripts/python -m pytest -q --basetemp=<writable ASCII path>`:
+**7 passed in 4.57s**. Actual temporary loopback TLS connections and SQLite files;
+wrong certificate rejected. Sandbox blocks loopback, so test execution required
+elevated tool access. Default pytest temp location also inaccessible; explicit
+ASCII basetemp used. Initial runs failed on these environment constraints before
+test execution; no security fallback added.
