@@ -228,3 +228,15 @@ Free-only release checks: **27 passed in 20.99s**. Plan/disk regression check
 asserts plan: free and no disk stanza; ephemeral-retention notice verified.
 Owner completed sign-in; Render workspace dashboard observed authenticated.
 Proceed only with Free/$0 service. No separate database service will be used.
+
+Actual Render free service created: srv-dbusv3vf3r2c739lkrp0, blueprint
+exs-dbusuek9v7es739ie190, URL https://safesignal-campus.onrender.com .
+Workspace Hobby/no card/$0 usage confirmed before creation; service shows Free.
+Initial deployment built and went live at commit feb0f18, but live role pages
+returned 400. Root cause: Waitress strips untrusted forwarded headers before
+ProxyFix sees HTTPS. Fixed in the actual server configuration by trusting only
+X-Forwarded-Proto from Render ingress, never forwarded Host; HTTPS remains required.
+Real Waitress HTTP regression check passed (1 passed in 1.89s), including secure
+cookies, rejected plain HTTP and rejected spoofed Host. Redeploy pending.
+Private environment-secret inspection was automatically rejected; no secret values
+were read/exported. Public-page/health verification used instead.
