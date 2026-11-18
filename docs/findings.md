@@ -58,3 +58,6 @@ does not resubmit; responder terminal state never regresses. One worker per
 outbox is the supported orchestration model. SQLite errors surface rather than
 silently claiming data saved. Restart test uses a separate Python process.
 `python -m pytest -q --basetemp=<ASCII path>`: **11 passed in 6.90s**, including actual lost application receipt after commit and same UUID retry.
+
+## Phase 3
+Reliability commit adbf41a merged. Separate authenticated Flask portals with CSRF, escaped templates, strict loopback Host checking, no-store/CSP headers, session login throttling and distinct cookies. Worker independent of browser. Orchestrator starts three processes. Full suite: 12 passed in 8.39s; web adapter tests use live TLS backend. Browser visual verification pending. Local JSON configuration chosen instead of dotenv to avoid another dependency; SAFESIGNAL_* environment overrides supported.

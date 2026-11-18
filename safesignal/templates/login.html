@@ -1,0 +1,7 @@
+{% extends 'base.html' %}{% block content %}
+<section class="login panel"><div class="eyebrow">LOCAL ACCESS</div><h1>{{ role|capitalize }} console</h1>
+<p>Enter the {{ role }} token from your ignored local/config.json file. Use synthetic data only.</p>
+{% if error %}<p role="alert" class="error">{{ error }}</p>{% endif %}
+<form method="post"><input type="hidden" name="csrf" value="{{ session.csrf }}">
+<label>Access token<input type="password" name="token" required autocomplete="off"></label><button>Open console</button></form></section>
+{% endblock %}

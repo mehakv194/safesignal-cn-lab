@@ -1,0 +1,8 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SafeSignal · {{ role|capitalize }}</title><link rel="stylesheet" href="{{ url_for('static',filename='styles.css') }}">
+<script defer src="{{ url_for('static',filename='app.js') }}"></script></head>
+<body><div class="notice">SIMULATION — NOT FOR REAL EMERGENCIES</div>
+<header><a class="brand" href="/">◉ SafeSignal<span>COMPUTER NETWORKS LAB</span></a><div class="tag">{{ role|capitalize }} / Test environment</div></header>
+<main>{% block content %}{% endblock %}</main>
+<footer>Verified TLS/TCP · Local SQLite · Synthetic alerts only<br>Server received means stored. Responder acknowledged means a test responder acknowledged it. Neither means assistance dispatched.</footer></body></html>

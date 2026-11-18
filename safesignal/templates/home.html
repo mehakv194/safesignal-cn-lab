@@ -1,0 +1,28 @@
+{% extends 'base.html' %}{% block content %}
+<div class="title"><div><div class="eyebrow">{{ 'COMPOSE · QUEUE · CONFIRM' if role == 'sender' else 'REVIEW · PRIORITIZE · ACKNOWLEDGE' }}</div>
+<h1>{{ 'Every alert has a journey.' if role == 'sender' else 'Responder console' }}</h1>
+<p>{{ 'Save locally. Transmit securely. Track each acknowledgment.' if role == 'sender' else 'Synthetic incoming alerts, ordered by severity.' }}</p></div>
+<form action="/logout" method="post"><input type="hidden" name="csrf" value="{{ session.csrf }}"><button class="secondary">Sign out</button></form></div>
+{% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+<div class="layout">
+{% if role == 'sender' %}<section class="panel compose"><div class="eyebrow">01 / NEW SYNTHETIC ALERT</div><h2>Send a test signal</h2>
+<form action="/submit" method="post"><input type="hidden" name="csrf" value="{{ session.csrf }}">
+<label>Severity<select name="severity">{% for severity in severities %}<option{% if severity == 'LOW' %} selected{% endif %}>{{ severity }}</option>{% endfor %}</select></label>
+<label>Description<textarea name="description" minlength="10" maxlength="300" rows="4" required placeholder="TEST ONLY: simulated campus alert"></textarea></label>
+<label>Synthetic location <span>(optional)</span><input name="location" maxlength="120" placeholder="Synthetic Block A"></label>
+<p class="muted">Saved to the local outbox before any network attempt.</p><button>Save test SOS locally →</button></form>
+<div id="simulation"></div></section>{% endif %}
+<section class="panel journey"><div class="eyebrow">{{ '02 / PERSISTED OUTBOX' if role == 'sender' else 'INCOMING SIGNALS' }}</div>
+<div class="section-title"><h2>{{ 'Alert journey' if role == 'sender' else 'Alert queue' }}</h2><a href="/">Refresh</a></div>
+<p class="muted">Updates every 3 seconds. Timestamps are UTC. Server received ≠ responder acknowledged.</p>
+<div id="live" aria-live="polite">
+<div class="stats"><div><strong>{{ rows|length }}</strong><span>Visible alerts</span></div><div><strong>{{ rows|selectattr('status','equalto','RESPONDER_ACKNOWLEDGED')|list|length }}</strong><span>Acknowledged</span></div></div>
+{% for row in rows %}<article class="alert"><div class="alert-top"><span class="severity {{ row.alert.severity|lower }}">{{ row.alert.severity }}</span><span class="chip">{{ row.status|replace('_',' ') }}</span></div>
+<h3>{{ row.alert.description }}</h3><p>{{ row.alert.location or 'No location supplied' }}</p><code>{{ row.alert_id }}</code>
+<p class="muted">Created {{ row.alert.created_at }}{% if role == 'sender' %} · {{ row.attempt_count }} submission attempts{% endif %}</p>
+{% if row.last_error %}<p class="error">{{ row.last_error }} · Next attempt (Unix time): {{ row.next_attempt_at }}</p>{% endif %}
+<details><summary>View factual timeline</summary><ol>{% for event in row.timeline %}<li>{{ event.event|replace('_',' ') }}<small>{{ event.recorded_at }}</small></li>{% endfor %}</ol></details>
+{% if role == 'responder' and row.status != 'RESPONDER_ACKNOWLEDGED' %}<form action="/ack/{{ row.alert_id }}" method="post"><input type="hidden" name="csrf" value="{{ session.csrf }}"><button>Acknowledge test alert</button></form>{% endif %}
+{% if role == 'sender' and row.status == 'QUEUED' %}<form action="/retry/{{ row.alert_id }}" method="post"><input type="hidden" name="csrf" value="{{ session.csrf }}"><button class="secondary">Retry now · same UUID</button></form>{% endif %}
+</article>{% else %}<div class="empty"><h3>No signals yet</h3><p>{{ 'Create a synthetic alert to begin the journey.' if role == 'sender' else 'New test alerts will appear here.' }}</p></div>{% endfor %}</div></section></div>
+{% endblock %}
