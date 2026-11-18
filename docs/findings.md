@@ -240,3 +240,11 @@ Real Waitress HTTP regression check passed (1 passed in 1.89s), including secure
 cookies, rejected plain HTTP and rejected spoofed Host. Redeploy pending.
 Private environment-secret inspection was automatically rejected; no secret values
 were read/exported. Public-page/health verification used instead.
+
+Final deployment: source 95082a6, Render deployment dep-dbutalnf3r2c73fm7hng
+succeeded on 18 November 2026. Public landing, health and sender login returned
+HTTP 200; both role login forms were also verified in the browser. CI run
+44350134759 passed 28 tests on Linux (16.55s) and Windows (21.86s).
+Live URL: https://safesignal-campus.onrender.com/ . One Free service, SQLite only,
+no paid disk/database/add-ons and no card added. Authenticated live incident actions
+remain untested; the owner retrieves access tokens directly from Render.

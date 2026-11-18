@@ -2,6 +2,10 @@
 
 **SIMULATION — NOT FOR REAL EMERGENCIES**
 
+**Live app: https://safesignal-campus.onrender.com/** — one address for sender and
+responder dashboards, hosted on Render Free with SQLite. Free instances can sleep
+and reports can reset after restarts. See [hosting details](docs/hosting.md).
+
 A campus incident coordination web app: report a synthetic medical, fire, safety
 or infrastructure incident; assign a response team; record progress notes; and
 resolve it. The networking core preserves verified TLS/TCP, persistent queues,
@@ -121,12 +125,13 @@ this is not a multi-user institutional account system.
 
 ## One hosted deployment
 
-The same app can run as one Python service with one public HTTPS address.
+The app is live as one Python service at https://safesignal-campus.onrender.com/.
 [Deployment configuration and approval boundary](docs/hosting.md).
 `render.yaml` uses **only Render Free, no paid disk and no external database**.
 The hosted SQLite files can reset when the free server restarts. The provider
 website address stays the same while the service exists; free instances can sleep.
-Local lab databases remain on your own disk. Account sign-in is needed to deploy.
+Local lab databases remain on your own disk. The owner obtains role access tokens
+from Render's Environment page; local demo tokens do not grant hosted access.
 
 ## Configuration, retention and limits
 

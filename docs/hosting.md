@@ -6,6 +6,20 @@ paid instance, persistent disk, external database or trial subscription is allow
 
 ## What runs
 
+Live URL: https://safesignal-campus.onrender.com/
+Sender: https://safesignal-campus.onrender.com/sender/
+Responder: https://safesignal-campus.onrender.com/responder/
+
+Deployed on 18 November 2026 at source commit 95082a6. Render reported the
+deployment succeeded. Public landing, health endpoint and both role login pages
+were verified. CI passed all 28 tests on Windows and Linux. Authenticated hosted
+incident actions were not tested because private deployment tokens were not read.
+
+Service: https://dashboard.render.com/web/srv-dbusv3vf3r2c739lkrp0
+Owner-only tokens: https://dashboard.render.com/web/srv-dbusv3vf3r2c739lkrp0/env
+Use SAFESIGNAL_SENDER_TOKEN and SAFESIGNAL_RESPONDER_TOKEN respectively.
+The service shows Free; the workspace showed Hobby, no card and zero charges.
+
 One Render Free Python web service, one instance. Waitress serves the landing
 page, /sender/, /responder/ and /healthz. The existing private verified TLS/TCP
 server and sender worker run inside the same process. SQLite is stored under
