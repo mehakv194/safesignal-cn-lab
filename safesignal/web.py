@@ -57,24 +57,30 @@ def create_app(role, config, call, outbox=None, faults=None):
     @app.get('/')
     def home():
         error = None
+        reachable = False
         try:
             if role == 'sender':
                 rows = outbox.rows()
                 for row in rows:
                     row['timeline'] = outbox.timeline(row['alert_id'])
+                try:
+                    reachable = call('HEALTH')['status'] == 'OK'
+                except (OSError, EOFError, ValueError):
+                    pass
             else:
                 offset = max(0, int(request.args.get('offset', '0')))
-                reply = call('LIST_ALERTS', {'offset': offset})
+                reply = call('LIST_ALERTS', {'offset': offset, 'severity': request.args.get('severity',''),
+                                           'state': request.args.get('state',''), 'newest': request.args.get('newest') == '1'})
                 if reply['status'] != 'OK':
                     raise ValueError('Backend rejected request')
                 rows = reply['alerts']
-                rows.sort(key=lambda r: (SEVERITIES.index(r['severity']), r['server_received_at']))
+                reachable = True
                 rows = [dict(r, alert=r, status=r['code'], timeline=call('GET_AUDIT', {'alert_id': r['alert_id']}).get('events', [])) for r in rows]
         except (OSError, EOFError, ValueError):
             rows, error = [], 'TLS backend unavailable. Saved sender alerts remain on disk.'
         return render_template('home.html', role=role, rows=rows, error=error, severities=SEVERITIES,
                                faults=faults, preset=faults.preset() if faults else 'normal',
-                               offset=request.args.get('offset', '0'))
+                               offset=request.args.get('offset', '0'), reachable=reachable)
 
     @app.post('/simulation')
     def simulation():

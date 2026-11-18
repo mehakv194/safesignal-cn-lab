@@ -58,12 +58,15 @@ class Store:
                     server_received_at=row['server_received_at'],
                     responder_acknowledged_at=row['responder_acknowledged_at'])
 
-    def listing(self, offset=0):
+    def listing(self, offset=0, severity='', status='', newest=False):
+        from .models import SEVERITIES
+        if severity not in ('', *SEVERITIES) or status not in ('', 'SERVER_RECEIVED', 'RESPONDER_ACKNOWLEDGED'):
+            raise ValueError('Invalid filter')
+        order = 'server_received_at DESC' if newest else "CASE json_extract(payload,'$.severity') WHEN 'CRITICAL' THEN 0 WHEN 'HIGH' THEN 1 WHEN 'MEDIUM' THEN 2 ELSE 3 END, server_received_at"
         with self.connect() as db:
-            ids = db.execute('''SELECT alert_id FROM alerts ORDER BY
-                CASE json_extract(payload,'$.severity') WHEN 'CRITICAL' THEN 0
-                WHEN 'HIGH' THEN 1 WHEN 'MEDIUM' THEN 2 ELSE 3 END,
-                server_received_at LIMIT 5 OFFSET ?''', (offset,)).fetchall()
+            ids = db.execute(f'''SELECT alert_id FROM alerts WHERE
+                (?='' OR json_extract(payload,'$.severity')=?) AND (?='' OR status=?)
+                ORDER BY {order} LIMIT 5 OFFSET ?''', (severity, severity, status, status, offset)).fetchall()
         return [self.status(row[0]) for row in ids]
 
     def acknowledge(self, aid):
