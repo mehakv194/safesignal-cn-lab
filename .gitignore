@@ -1,0 +1,11 @@
+.env
+.venv/
+__pycache__/
+.pytest_cache/
+*.sqlite*
+*.db
+certs/
+local/
+starter/
+artifacts/
+*.pcap*
