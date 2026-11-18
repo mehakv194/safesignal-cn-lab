@@ -201,3 +201,8 @@ responder outage behavior (503 with explicit unavailable message, no invented
 zero counts). Browser search, light evidence chart, same-origin navigation and
 report modal verified; browser error log empty. Exact mobile-device testing not
 performed. An additional outage test brings the suite to 26 tests (CI below).
+
+Campus feature commit 155b629 merged after successful CI:
+https://github.com/mehakv194/safesignal-cn-lab/actions/runs/44341259585 .
+Both Windows and Ubuntu jobs passed all 26 tests. Staged public-content scan of
+74 files passed; private/generated data excluded. No paid resources created.
