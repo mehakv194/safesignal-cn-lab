@@ -1,0 +1,15 @@
+{
+  "id": "/",
+  "name": "SafeSignal Campus",
+  "short_name": "SafeSignal",
+  "description": "A campus safety and computer networks simulation.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f0f5f1",
+  "theme_color": "#104c39",
+  "icons": [
+    { "src": "safesignal-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "safesignal-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

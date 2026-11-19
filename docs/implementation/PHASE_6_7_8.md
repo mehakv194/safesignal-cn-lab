@@ -28,3 +28,11 @@ Configuration inventory: one Render Free service, secret-injected sender and res
 Rollback reference: deployed source 9b130a7, Render deploy dep-dbvj82nf3r2c73cdnehg. Verify /healthz and both role login screens after any rollback. A code rollback cannot recover data lost on Render's ephemeral filesystem. For local recovery, stop writers, retain matched private SQLite snapshots, and verify copies before switching. No schema change is required by Phases 6–8.
 
 Readiness gate: passed for the approved registration-off simulation. Production authenticated journeys require existing verified accounts. Render Free sleep and SQLite reset remain operational limits.
+
+## Phase 8 — Installable web app
+
+The owner approved all remaining phases. This release selects the PWA option. The public landing and v2 role pages link a standalone manifest with a root launch URL, original 192/512 px icons and a maskable 512 px icon. The landing page explains installation. No service worker, device data store, upload quota, offline queue or notification permission is required. Private pages retain no-store headers and normal authentication.
+
+The final local Windows suite passed 68 tests in 49.17s. The install asset test checked the manifest MIME type, launch URL, standalone mode, PNG dimensions, links on both role pages and protected walk access. A Node regression probe delayed a poll response until a form became dirty and verified it preserved the draft. The same probe verified offline form submissions were stopped. `node --check` and `git diff --check` passed.
+
+Gate: install prerequisites and privacy checks passed. Physical-device installation, low-end-device performance and screen reader testing remain unverified. Rollback removes the manifest links and install instructions. No worker or private cache needs removal.
