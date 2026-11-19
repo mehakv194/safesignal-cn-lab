@@ -126,9 +126,18 @@ def test_walk_http_to_real_tls_queue_and_owner_denial(tmp_path):
     auth=Identity(tmp_path/'server.sqlite','key',mail=lambda *args:mail.append(args))
     email='0000000001@mail.jiit.ac.in'
     auth.register(email,'synthetic-password-123');auth.consume(mail[-1][2],'VERIFY')
-    config=dict(identity=True,hosted=False,session_secret='key',sender_token='sender',responder_token='responder',allowed_hosts=('localhost',),mail=lambda *args:None)
+    desk_email='0000000002@mail.jiit.ac.in'
+    auth.register(desk_email,'synthetic-password-123');auth.consume(mail[-1][2],'VERIFY')
+    auth.provision(desk_email,'Campus Safety')
+    config=dict(identity=True,hosted=True,session_secret='key',sender_token='sender',responder_token='responder',
+                allowed_hosts=('localhost',),mail=None)
     with hosted_runtime(config,tmp_path) as app:
-        c=Client(app,Response)
+        class HTTPSClient(Client):
+            def open(self, *args, **kwargs):
+                if args and isinstance(args[0], str):
+                    kwargs.setdefault('base_url','https://localhost')
+                return super().open(*args, **kwargs)
+        c=HTTPSClient(app,Response)
         csrf=lambda page:re.search(r'name="csrf" value="([^"]+)"',page.text).group(1)
         token=csrf(c.get('/sender/login'))
         c.post('/sender/login',data=dict(csrf=token,email=email,password='synthetic-password-123'))
@@ -153,5 +162,20 @@ def test_walk_http_to_real_tls_queue_and_owner_denial(tmp_path):
             time.sleep(.1)
         assert 'Server Received' in page.text
         assert Store(tmp_path/'server.sqlite').dashboard()['total']==1
-        anonymous=Client(app,Response)
+        anonymous=HTTPSClient(app,Response)
         assert anonymous.get(reply.location).status_code==302
+        assert 'Registration unavailable' in anonymous.get('/sender/register').text
+        assert anonymous.get('/responder/trust-lab').status_code==404
+        desk=HTTPSClient(app,Response)
+        token=csrf(desk.get('/responder/login'))
+        assert desk.post('/responder/login',data=dict(csrf=token,email=desk_email,password='synthetic-password-123')).status_code==302
+        desk_case=case.location.replace('/sender/','/responder/',1)
+        assert 'simulated help requested' in desk.get(desk_case).text
+        def message(client,path,body):
+            token=csrf(client.get(path))
+            return client.post(path+'/message',headers={'Accept':'application/json'},
+                               data=dict(csrf=token,client_uuid=str(uuid4()),body=body))
+        assert message(c,case.location,'Synthetic student check-in').json['code']=='SERVER_RECEIVED'
+        assert 'Synthetic student check-in' in desk.get(desk_case).text
+        assert message(desk,desk_case,'Synthetic desk reply').json['code']=='SERVER_RECEIVED'
+        assert 'Synthetic desk reply' in c.get(case.location).text

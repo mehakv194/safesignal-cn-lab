@@ -32,6 +32,7 @@ document.addEventListener('submit', event => {
   if (event.target.method.toLowerCase() !== 'post') return;
   const feedback = document.querySelector('#action-feedback');
   if (feedback) feedback.textContent = navigator.onLine ? 'Sending — waiting for server confirmation…' : 'Offline — reconnect before submitting. Delivery is not confirmed.';
+  if (feedback && !navigator.onLine) event.preventDefault();
 });
 document.addEventListener('submit', async event => {
   const form=event.target;
@@ -43,9 +44,14 @@ document.addEventListener('submit', async event => {
   form.dataset.sending='true';
   status.textContent='Pending — waiting for a server receipt…';
   const button=form.querySelector('[type="submit"]');
+  const draft=form.querySelector('textarea[name="body"]');
+  const submitted=new URLSearchParams(new FormData(form));
   button.disabled=true;
+  draft.readOnly=true;
+  const quickReplies=[...form.querySelectorAll('[data-quick-reply]')];
+  quickReplies.forEach(control => { control.disabled=true; });
   try {
-    const response=await fetch(form.action,{method:'POST',headers:{Accept:'application/json'},body:new URLSearchParams(new FormData(form))});
+    const response=await fetch(form.action,{method:'POST',headers:{Accept:'application/json'},body:submitted});
     const result=await response.json();
     if (!response.ok || result.status!=='OK') throw new Error('unconfirmed');
     form.querySelector('textarea[name="body"]').value='';
@@ -59,12 +65,20 @@ document.addEventListener('submit', async event => {
     const globalStatus=document.querySelector('#action-feedback');
     if (globalStatus) globalStatus.textContent='Message not confirmed. Draft retained.';
   }
-  finally { delete form.dataset.sending; button.disabled=false; }
+  finally {
+    delete form.dataset.sending;
+    button.disabled=false;
+    draft.readOnly=false;
+    quickReplies.forEach(control => { control.disabled=false; });
+  }
 });
 let polling = false;
+function refreshable(region) {
+  return !region.contains(document.activeElement)
+    && !region.querySelector('details[open], form[data-dirty], form[data-sending]');
+}
 setInterval(async () => {
-  const regions = [...document.querySelectorAll('[data-poll-region]')].filter(region =>
-    !region.contains(document.activeElement) && !region.querySelector('details[open], form[data-dirty],form[data-sending]'));
+  const regions = [...document.querySelectorAll('[data-poll-region]')].filter(refreshable);
   if (polling || document.hidden || !regions.length) return;
   polling = true;
   try {
@@ -74,7 +88,7 @@ setInterval(async () => {
     const html = new DOMParser().parseFromString(await response.text(),'text/html');
     regions.forEach(region => {
       const updated = html.getElementById(region.id);
-      if (updated) region.replaceChildren(...updated.childNodes);
+      if (updated && refreshable(region)) region.replaceChildren(...updated.childNodes);
     });
     updateCharts();
   } catch { /* Retain last observed state during a connection failure. */ }
