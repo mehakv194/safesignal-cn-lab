@@ -64,6 +64,8 @@ class AlertServer(socketserver.ThreadingTCPServer):
                         'ROOM_GET':('sender','responder'),'ROOM_SEND':('sender','responder'),'ROOM_FEEDBACK':('sender','responder')}
             permitted = required.get(kind, ())
             if role is None or (role not in permitted if isinstance(permitted,tuple) else permitted != role):
+                if self.identity:
+                    self.identity.audit('ROLE_DENIED','DENIED',reason='COMMAND_ROLE')
                 return dict(status='ERROR', code='UNAUTHORIZED', request_id=rid)
             with self.rate_lock:
                 start, count = self.rates.get(role, (time.monotonic(), 0))
@@ -81,6 +83,7 @@ class AlertServer(socketserver.ThreadingTCPServer):
                 if principal['role'] != ('student' if role=='sender' else 'responder'):
                     return dict(status='ERROR',code='UNAUTHORIZED',request_id=rid)
                 if kind in ('GET_STATUS','GET_AUDIT','ACK_ALERT','UPDATE_INCIDENT') and not self.store.authorized(principal,payload.get('alert_id')):
+                    self.identity.audit('OBJECT_DENIED','DENIED',principal['id'],'incident',payload.get('alert_id'),'OWNER_OR_TEAM')
                     return dict(status='ERROR',code='NOT_FOUND',request_id=rid)
                 if kind == 'SUBMIT_ALERT' and not principal.get('job'):
                     return dict(status='ERROR',code='UNAUTHORIZED',request_id=rid)

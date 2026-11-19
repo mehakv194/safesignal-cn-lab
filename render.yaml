@@ -23,3 +23,5 @@ services:
         value: '1'
       - key: ENABLE_DEMO_FAULTS
         value: '0'
+      - key: SAFESIGNAL_REGISTRATION_ENABLED
+        value: '0'

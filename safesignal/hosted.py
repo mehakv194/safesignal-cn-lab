@@ -4,7 +4,7 @@ import json
 import os
 from pathlib import Path
 import shutil
-import sqlite3
+from .database import connection
 import tempfile
 import threading
 
@@ -34,7 +34,7 @@ def hosted_runtime(config, data_dir, enable_faults=False):
             backup=data/'pre-v2-backup'/name
             if source.exists() and not backup.exists():
                 backup.parent.mkdir(exist_ok=True)
-                with sqlite3.connect(source.resolve().as_uri()+'?mode=ro',uri=True) as old, sqlite3.connect(backup) as saved:
+                with connection(source.resolve().as_uri()+'?mode=ro',uri=True) as old, connection(backup) as saved:
                     old.backup(saved)
     evidence = Path(config.get('evidence_dir',data / 'artifacts'))
     reviewed = Path(__file__).resolve().parents[1] / 'docs/results'
@@ -47,6 +47,7 @@ def hosted_runtime(config, data_dir, enable_faults=False):
             shutil.copyfile(reviewed / name, run_dir / name)
         evidence.joinpath('latest.json').write_text(json.dumps(report))
     settings = dict(config, hosted=config.get('hosted',True), combined=True, evidence_dir=str(evidence))
+    enable_faults=enable_faults and not settings['hosted']
     faults = Faults(data / 'faults.json', enable_faults)
     identity = Identity(data/'server.sqlite',config['session_secret'],mail=config.get('mail',configured_mail())) if config.get('identity') else None
     if enable_faults:
@@ -119,6 +120,7 @@ def main():
         raise ValueError('Configure explicit SAFESIGNAL_ALLOWED_HOSTS')
     config['allowed_hosts'] = tuple(hosts)
     config['identity'] = True
+    config['mail'] = configured_mail() if os.environ.get('SAFESIGNAL_REGISTRATION_ENABLED')=='1' else None
     config['ephemeral_storage'] = os.environ.get('SAFESIGNAL_EPHEMERAL_STORAGE')=='1'
     data_dir = os.environ['SAFESIGNAL_DATA_DIR']
     with hosted_runtime(config, data_dir, os.environ.get('ENABLE_DEMO_FAULTS') == '1') as app:

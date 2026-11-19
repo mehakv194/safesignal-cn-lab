@@ -21,6 +21,10 @@ def create_app(role, config, call, outbox=None, faults=None, identity=None):
     login_attempts = []
     evidence_dir = Path(config.get('evidence_dir', 'artifacts'))
     raw_call = call
+    local_lab=bool(identity and config.get('trust_lab') and not config.get('hosted',False)
+                   and set(config.get('allowed_hosts',('127.0.0.1','localhost'))) <= {'127.0.0.1','localhost'})
+    if config.get('hosted'):
+        faults=None
     if identity:
         def call(kind,payload=None):
             return raw_call(kind,payload,dict(sid=session.get('sid','')))
@@ -47,7 +51,7 @@ def create_app(role, config, call, outbox=None, faults=None, identity=None):
 
     @app.context_processor
     def deployment_context():
-        return {'identity_enabled':bool(identity),'current_user':getattr(g,'user',None),'hosted': config.get('hosted', False), 'combined':config.get('combined',False),
+        return {'trust_lab_enabled':local_lab,'identity_enabled':bool(identity),'current_user':getattr(g,'user',None),'hosted': config.get('hosted', False), 'combined':config.get('combined',False),
                 'ephemeral_storage':config.get('ephemeral_storage',False), 'role':role,'categories':CATEGORIES,
                 'severities':SEVERITIES,'incident_states':INCIDENT_STATES,'teams':((g.user['team'],) if identity and getattr(g,'user',None) and g.user['role']=='responder' else RESPONSE_TEAMS),
                 'today':datetime.now(timezone.utc).strftime('%d %b %Y'), 'local_role_url':
@@ -65,6 +69,8 @@ def create_app(role, config, call, outbox=None, faults=None, identity=None):
 
     @app.before_request
     def guard():
+        if request.endpoint in ('trust_lab','run_trust_fixture') and (not local_lab or request.remote_addr not in ('127.0.0.1','::1')):
+            abort(404)
         if request.host.split(':')[0] not in config.get('allowed_hosts', ('127.0.0.1', 'localhost')):
             abort(400)
         if config.get('hosted') and not request.is_secure:
@@ -103,7 +109,7 @@ def create_app(role, config, call, outbox=None, faults=None, identity=None):
                 email=request.form.get('email','')[:254]
                 if not identity.limit('login',email.lower().strip(),request.remote_addr or ''):
                     abort(429)
-                sid=identity.login(email,request.form.get('password','')[:129],'student' if role=='sender' else 'responder')
+                sid=identity.login(email,request.form.get('password','')[:129],'student' if role=='sender' else 'responder',request.remote_addr or '')
                 if sid:
                     identity.logout(session.get('sid',''))
                     session.clear()
@@ -305,6 +311,27 @@ def create_app(role, config, call, outbox=None, faults=None, identity=None):
         return redirect(url_for('home'))
 
     if identity:
+        from .trust_lab import TrustLab, SCENARIOS
+        lab=TrustLab(identity) if local_lab else None
+
+        @app.get('/trust-lab')
+        def trust_lab():
+            if role!='responder' or not lab:
+                abort(404)
+            return render_template('trust_lab.html',scenarios=SCENARIOS,result=session.get('trust_result'),events=lab.events())
+
+        @app.post('/trust-lab/run')
+        def run_trust_fixture():
+            if role!='responder' or not lab:
+                abort(404)
+            if not identity.limit('trust_lab',g.user['id'],request.remote_addr or ''):
+                abort(429)
+            try:
+                session['trust_result']=lab.run(request.form.get('scenario'),g.user['id'])
+            except ValueError:
+                abort(400)
+            return redirect(url_for('trust_lab'))
+
         @app.post('/incident/<aid>/message')
         def send_message(aid):
             payload=dict(alert_id=aid,client_uuid=request.form.get('client_uuid'),body=request.form.get('body',''))

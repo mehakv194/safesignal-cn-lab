@@ -31,7 +31,11 @@ class Rooms:
 
     def access(self,db,user,aid):
         scope,args=self.store.scope(user)
-        return db.execute(f'SELECT * FROM alerts WHERE alert_id=? AND {scope}',(aid,*args)).fetchone()
+        row=db.execute(f'SELECT * FROM alerts WHERE alert_id=? AND {scope}',(aid,*args)).fetchone()
+        if not row:
+            db.execute('INSERT INTO security_events(event,result,stamp,actor_id,target_type,reason_code) VALUES(?,?,?,?,?,?)',
+                       ('ROOM_DENIED','DENIED',self.identity.clock(),user['id'],'incident','OWNER_OR_TEAM'))
+        return row
 
     def get(self,user,aid,before=0):
         if type(before)!=int or before<0:

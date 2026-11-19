@@ -6,6 +6,8 @@
 responder dashboards, hosted on Render Free with SQLite. Free instances can sleep
 and reports can reset after restarts. See [hosting details](docs/hosting.md).
 
+SafeSignal v2 adds verified individual accounts, SafeWalk check-ins, private Incident Room messaging and a local-only Trust Lab. Hosted registration is explicitly disabled by owner choice until real email delivery is approved and verified. See [current phase reports](docs/implementation/PHASE_STATUS.md) and [v2 local setup](docs/implementation/V2_LOCAL_GUIDE.md).
+
 A campus incident coordination web app: report a synthetic medical, fire, safety
 or infrastructure incident; assign a response team; record progress notes; and
 resolve it. The networking core preserves verified TLS/TCP, persistent queues,
@@ -37,9 +39,12 @@ python3 -m venv .venv
 Open **[SafeSignal](http://127.0.0.1:5000)**: one address with
 [sender](http://127.0.0.1:5000/sender/) and
 [responder](http://127.0.0.1:5000/responder/) dashboards.
-Use the corresponding sender_token / responder_token from generated,
-ignored local/config.json. Never project or publish that file. The web page
-does not contain backend tokens. Omit --enable-demo-faults to disable injection.
+The combined app uses verified enrollment-email/password accounts. Configure real
+local mail or inject captured mail only in isolated tests; no inbox verification
+bypass is provided. Hosted registration is currently disabled. See the v2 setup
+guide for restricted responder provisioning. Internal role tokens remain private
+service credentials, not human dashboard logins. Use --enable-trust-lab only for
+a controlled local cybersecurity demonstration. Omit --enable-demo-faults to disable injection.
 Ctrl+C stops the app; interrupted submissions recover on restart. Existing
 databases migrate without clearing records. The optional original separate-process
 CN lab launcher remains `scripts/run_demo.py`; never run both against one outbox.
@@ -130,8 +135,7 @@ The app is live as one Python service at https://safesignal-campus.onrender.com/
 `render.yaml` uses **only Render Free, no paid disk and no external database**.
 The hosted SQLite files can reset when the free server restarts. The provider
 website address stays the same while the service exists; free instances can sleep.
-Local lab databases remain on your own disk. The owner obtains role access tokens
-from Render's Environment page; local demo tokens do not grant hosted access.
+Local lab databases remain on your own disk. Human users require individual verified accounts. Internal service tokens in Render's Environment page do not grant human dashboard access.
 
 ## Configuration, retention and limits
 

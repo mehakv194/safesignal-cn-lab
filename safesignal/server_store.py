@@ -1,6 +1,6 @@
 import hashlib
 import json
-import sqlite3
+from .database import connection
 
 from .models import now, validate_alert, SEVERITIES, CATEGORIES, INCIDENT_STATES, RESPONSE_TEAMS
 
@@ -40,9 +40,7 @@ class Store:
             db.execute('CREATE INDEX IF NOT EXISTS alerts_owner ON alerts(owner_user_id,server_received_at)')
 
     def connect(self):
-        db = sqlite3.connect(self.path, timeout=5)
-        db.row_factory = sqlite3.Row
-        return db
+        return connection(self.path)
 
     def submit(self, payload, owner=None):
         validate_alert(payload)

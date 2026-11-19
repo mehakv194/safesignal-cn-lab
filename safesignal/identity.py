@@ -4,14 +4,15 @@ import hmac
 import json
 import re
 import secrets
-import sqlite3
 import time
+import threading
 from uuid import uuid4
 
 from argon2 import PasswordHasher
 from argon2.exceptions import VerificationError, InvalidHashError
 
 from .models import validate_alert, RESPONSE_TEAMS
+from .database import connection
 
 
 def email_address(value):
@@ -35,6 +36,7 @@ class Identity:
         self.path, self.clock, self.mail = str(path), clock, mail
         self.key = hmac.digest(secret.encode(), b'safesignal-principal-v2', 'sha256')
         self.hasher = PasswordHasher(time_cost=3, memory_cost=65536, parallelism=4)
+        self.password_slots=threading.BoundedSemaphore(2)
         self.dummy = self.hasher.hash(secrets.token_urlsafe(24))
         with self.connect() as db:
             db.executescript('''
@@ -58,14 +60,44 @@ class Identity:
                     alert_id TEXT PRIMARY KEY,owner_id TEXT NOT NULL,payload TEXT NOT NULL,
                     enqueued INTEGER NOT NULL DEFAULT 0);
                 INSERT OR IGNORE INTO schema_migrations VALUES(1);
+                CREATE TABLE IF NOT EXISTS login_failures(key TEXT NOT NULL,stamp REAL NOT NULL);
+                CREATE INDEX IF NOT EXISTS failure_window ON login_failures(key,stamp);
             ''')
             if 'legacy' not in {r[1] for r in db.execute('PRAGMA table_info(users)')}:
                 db.execute('ALTER TABLE users ADD COLUMN legacy INTEGER NOT NULL DEFAULT 0')
+            for name in ('actor_id','target_type','target_id','reason_code'):
+                if name not in {r[1] for r in db.execute('PRAGMA table_info(security_events)')}:
+                    db.execute(f"ALTER TABLE security_events ADD COLUMN {name} TEXT NOT NULL DEFAULT ''")
+            db.execute('INSERT OR IGNORE INTO schema_migrations VALUES(4)')
+
+    def audit(self,event,result,actor='',target_type='',target_id='',reason=''):
+        with self.connect() as db:
+            db.execute('INSERT INTO security_events(event,result,stamp,actor_id,target_type,target_id,reason_code) VALUES(?,?,?,?,?,?,?)',
+                       (event,result,self.clock(),actor,target_type,str(target_id)[:64],reason))
+
+    def failed_login(self,account,ip):
+        key=digest(account+'|'+ip)
+        with self.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            db.execute('DELETE FROM login_failures WHERE stamp<?',(self.clock()-60,))
+            count=db.execute('SELECT count(*) FROM login_failures WHERE key=?',(key,)).fetchone()[0]
+            # At most six markers per key/window; normal auth throttling caps requests too.
+            if count<6:
+                db.execute('INSERT INTO login_failures VALUES(?,?)',(key,self.clock()))
+            if count==4:
+                db.execute('INSERT INTO security_events(event,result,stamp,reason_code) VALUES(?,?,?,?)',
+                           ('LOGIN_BURST','DETECTED',self.clock(),'FIVE_FAILED_LOGINS_IN_60S'))
 
     def connect(self):
-        db = sqlite3.connect(self.path, timeout=5)
-        db.row_factory = sqlite3.Row
-        return db
+        return connection(self.path)
+
+    def hash_password(self,value):
+        with self.password_slots:
+            return self.hasher.hash(value)
+
+    def verify_password(self,hashed,value):
+        with self.password_slots:
+            return self.hasher.verify(hashed,value)
 
     def limit(self, action, account, ip):
         stamp = self.clock()
@@ -91,7 +123,7 @@ class Identity:
         self.password(password)
         if self.mail is None:
             raise ValueError('Registration unavailable: email delivery is not configured.')
-        hashed = self.hasher.hash(password)
+        hashed = self.hash_password(password)
         with self.connect() as db:
             db.execute('INSERT OR IGNORE INTO users(id,email,password_hash,created) VALUES(?,?,?,?)',
                        (str(uuid4()), email, hashed, self.clock()))
@@ -122,7 +154,7 @@ class Identity:
     def consume(self, token, purpose, password=None):
         if purpose == 'RESET':
             self.password(password or '')
-            hashed = self.hasher.hash(password)
+            hashed = self.hash_password(password)
         with self.connect() as db:
             db.execute('BEGIN IMMEDIATE')
             row = db.execute('SELECT * FROM challenges WHERE hash=? AND purpose=? AND used IS NULL AND expires>?',
@@ -136,7 +168,7 @@ class Identity:
                 db.execute('UPDATE users SET password_hash=? WHERE id=?', (hashed, row['user_id']))
             db.execute('DELETE FROM sessions WHERE user_id=?', (row['user_id'],))
 
-    def login(self, email, password, role):
+    def login(self, email, password, role, ip=''):
         try:
             email = email_address(email)
         except ValueError:
@@ -144,10 +176,11 @@ class Identity:
         with self.connect() as db:
             user = db.execute('SELECT * FROM users WHERE email=?', (email,)).fetchone()
         try:
-            valid = self.hasher.verify(user['password_hash'] if user else self.dummy, password)
+            valid = self.verify_password(user['password_hash'] if user else self.dummy, password)
         except (VerificationError, InvalidHashError):
             valid = False
         if not valid or not user or not user['verified'] or user['disabled'] or user['role'] != role:
+            self.failed_login(email,ip)
             return None
         sid = secrets.token_urlsafe(32)
         stamp = self.clock()
@@ -174,13 +207,13 @@ class Identity:
         if not user:
             raise ValueError('Sign in again.')
         try:
-            self.hasher.verify(user['password_hash'], current)
+            self.verify_password(user['password_hash'], current)
         except VerificationError:
             raise ValueError('Current password was not accepted.') from None
         self.password(replacement)
         with self.connect() as db:
             db.execute('UPDATE users SET password_hash=? WHERE id=?',
-                       (self.hasher.hash(replacement), user['id']))
+                       (self.hash_password(replacement), user['id']))
             db.execute('DELETE FROM sessions WHERE user_id=?', (user['id'],))
 
     def provision(self, email, team, legacy=False):

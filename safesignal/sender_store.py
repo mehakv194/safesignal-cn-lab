@@ -1,5 +1,5 @@
 import json
-import sqlite3
+from .database import connection
 import time
 
 from .models import now, validate_alert, INCIDENT_STATES
@@ -32,9 +32,7 @@ class Outbox:
             db.execute('CREATE INDEX IF NOT EXISTS outbox_owner ON outbox(owner_user_id)')
 
     def connect(self):
-        db = sqlite3.connect(self.path, timeout=5)
-        db.row_factory = sqlite3.Row
-        return db
+        return connection(self.path)
 
     def enqueue(self, payload):
         validate_alert(payload)
@@ -51,6 +49,7 @@ class Outbox:
     def enqueue_owned(self,payload,owner):
         validate_alert(payload)
         with self.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
             old=db.execute('SELECT * FROM outbox WHERE alert_id=?',(payload['alert_id'],)).fetchone()
             if old:
                 if old['owner_user_id']!=owner or json.loads(old['payload'])!=payload:

@@ -1,0 +1,7 @@
+[
+  "VERIFIED\n\nGenuine authenticated message\n\nHmac Valid",
+  "REJECTED\n\nModified message rejected\n\nIntegrity Mismatch",
+  "DENIED\n\nAnother student's case denied\n\nObject Ownership",
+  "DENIED\n\nUnauthorized responder action denied\n\nServer Assigned Role",
+  "DETECTED\n\nBounded failed-login burst detected\n\nBounded Application Login Rule"
+]
