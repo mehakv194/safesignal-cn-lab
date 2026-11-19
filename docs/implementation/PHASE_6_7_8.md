@@ -36,3 +36,11 @@ The owner approved all remaining phases. This release selects the PWA option. Th
 The final local Windows suite passed 68 tests in 49.17s. The install asset test checked the manifest MIME type, launch URL, standalone mode, PNG dimensions, links on both role pages and protected walk access. A Node regression probe delayed a poll response until a form became dirty and verified it preserved the draft. The same probe verified offline form submissions were stopped. `node --check` and `git diff --check` passed.
 
 Gate: install prerequisites and privacy checks passed. Physical-device installation, low-end-device performance and screen reader testing remain unverified. Rollback removes the manifest links and install instructions. No worker or private cache needs removal.
+
+## Production verification
+
+Commit `cad5daf` passed all 68 tests on Linux (28.43s) and Windows (92.54s). [GitHub Actions run](https://github.com/mehakv194/safesignal-cn-lab/actions/runs/44580982531)
+
+Render reported the Free service live after 52.5 seconds. Its deployed source was `cad5daf`. The landing page, readiness endpoint, both login pages, registration information, manifest and both icons returned HTTP 200. Readiness was true, registration remained disabled, and the public Trust Lab URL returned 404. The live browser displayed the install instructions. [Render deployment](https://dashboard.render.com/web/srv-dbusv3vf3r2c739lkrp0/deploys/dep-dbvje8mc6qcc739klbcg) · [Browser capture](evidence/production-final-install.png)
+
+Authenticated flows were checked in isolated staging with synthetic accounts. Production checks used public endpoints. No real email delivery or device installation was attempted.

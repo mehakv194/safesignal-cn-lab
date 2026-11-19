@@ -111,3 +111,7 @@ Owner answered the email-delivery question: **Keep registration disabled for now
 Phases 3, 4 and 5: PASS. Final source 9b130a7 passed 67 tests on Linux (41.76s) and 67 on Windows (75.38s), CI run 44578793459. Fast-forwarded to main and deployed to existing Render Free service. Deployment dep-dbvj82nf3r2c73cdnehg reported Live on 19 November 2026. Public health/root/login/signup checks returned 200; public Trust Lab URLs returned 404. Signup button remains disabled by explicit owner decision.
 
 Actual deployment/test/rollback/limits record: [PRODUCTION_RELEASE_2026-11-19.md](PRODUCTION_RELEASE_2026-11-19.md). No production authenticated user journey or actual inbox delivery claimed. Local synthetic end-to-end journeys and hosted-mode regression tests passed. Phase 6 approval: PENDING; no further phase work started.
+
+## Phases 6–8 — deployed
+
+The owner subsequently approved all remaining phases and deployment. Network replay, privacy and hosted-mode staging checks passed. The optional Phase 8 deliverable is a standalone installable web app. Both GitHub CI platforms passed 68 tests. Render Free is live at source `cad5daf`, deployment `dep-dbvje8mc6qcc739klbcg`. The production smoke confirmed health, protected role entry points, registration disabled, install assets served and Trust Lab denied. Device, mail and staging details are in the [final gate report](PHASE_6_7_8.md).
