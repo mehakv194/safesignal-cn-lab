@@ -80,6 +80,8 @@ Implementation commit 7229354. Mobile-first student Home, phone bottom navigatio
 
 Final tests: `.venv/Scripts/python.exe -m pytest -q --basetemp=C:/Users/mehak/.codex/visualizations/2026/11/18/01a1eef0-be7d-75d1-b1ed-8f0bbffef830/v2-phases12-releasecheck` → **44 passed in 32.01s**, no failures/skips.
 
+Feature-branch CI run 44572886478 also passed: Linux 44 tests in 20.37s; Windows 44 tests in 33.94s. This run checks the feature branch, not a deployment.
+
 Home/login/queue checked at all seven required widths; no overflow or undersized visible controls in final measured pages; inputs 16px. Keyboard focus and password toggle checked. A real synthetic student→responder→resolution journey passed in browser. Full files/evidence/acceptance/rollback: [PHASE_2.md](PHASE_2.md).
 
 Remaining: real mail delivery and production/staging approval, real-device/screen-reader QA, Phases 3–7. No new public app deployment; Phase 1/2 remain on feature branch. No existing user database was migrated in development; tests/preview use isolated data.

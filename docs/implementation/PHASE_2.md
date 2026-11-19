@@ -25,7 +25,9 @@ Status: PASS for local implementation and responsive browser acceptance, not pub
 
 **44 passed in 32.01s**, exit 0. No skips/failures. Earlier Phase 2 integration runs: 42 passed in 28.05s and 44 passed in 30.71s. Final run includes the owner-index/query and landing updates.
 
-`git diff --check` passed (line-ending conversion notices only). No new Linux run or production smoke result claimed here.
+`git diff --check` passed (line-ending conversion notices only).
+
+After publishing the feature branch, GitHub CI run [44572886478](https://github.com/mehakv194/safesignal-cn-lab/actions/runs/44572886478) passed: Linux **44 passed in 20.37s**, Windows **44 passed in 33.94s**. No production smoke result claimed. CI noted an existing action-runtime deprecation notice; both jobs completed successfully.
 
 ## Browser acceptance evidence
 
