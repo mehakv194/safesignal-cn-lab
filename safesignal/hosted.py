@@ -103,7 +103,7 @@ def hosted_runtime(config, data_dir, enable_faults=False):
 
             app = DispatcherMiddleware(root, {
                 '/sender': create_app('sender', settings, caller('sender'), box, faults,identity),
-                '/responder': create_app('responder', settings, caller('responder'),identity=identity),
+                '/responder': create_app('responder', settings, caller('responder'), faults=faults, identity=identity),
             })
             try:
                 yield app

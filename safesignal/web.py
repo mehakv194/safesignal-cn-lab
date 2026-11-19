@@ -26,6 +26,8 @@ def create_app(role, config, call, outbox=None, faults=None, identity=None):
                    and set(config.get('allowed_hosts',('127.0.0.1','localhost'))) <= {'127.0.0.1','localhost'})
     if config.get('hosted'):
         faults=None
+    transfer_view = bool(config.get('combined') and (config.get('hosted') or (faults and faults.enabled)))
+    fault_controls = bool(transfer_view and faults and faults.enabled)
     if identity:
         def call(kind,payload=None):
             return raw_call(kind,payload,dict(sid=session.get('sid','')))
@@ -67,6 +69,10 @@ def create_app(role, config, call, outbox=None, faults=None, identity=None):
     @app.template_filter('epoch')
     def epoch(value):
         return datetime.fromtimestamp(value,timezone.utc).strftime('%d %b · %H:%M UTC') if value is not None else '—'
+
+    @app.template_filter('retry_time')
+    def retry_time(value):
+        return datetime.fromtimestamp(value, timezone.utc).strftime('%H:%M:%S')
 
     @app.before_request
     def guard():
@@ -144,6 +150,23 @@ def create_app(role, config, call, outbox=None, faults=None, identity=None):
 
     @app.get('/')
     def home():
+        if transfer_view and request.args.get('view') == 'network':
+            rows, events, error = [], [], None
+            if role == 'sender':
+                rows = owned_rows()[:1]
+                if rows:
+                    events = outbox.timeline(rows[0]['alert_id'])[-12:]
+            else:
+                try:
+                    reply = call('LIST_ALERTS', {'newest': True})
+                    if reply['status'] != 'OK':
+                        raise ValueError('Backend rejected request')
+                    rows = reply['alerts']
+                except (OSError, EOFError, ValueError):
+                    error = 'The incident server is unavailable. Its latest receipts could not be checked.'
+            return render_template('network_lab.html', rows=rows, events=events, error=error,
+                                   fault_controls=fault_controls,
+                                   preset=faults.preset() if fault_controls else None, view='network')
         error = None
         reachable = False
         rows = []
@@ -254,6 +277,8 @@ def create_app(role, config, call, outbox=None, faults=None, identity=None):
                 abort(400,'This action is not valid for the current incident state. Resolution and notes need 5–200 characters.')
         except (OSError,EOFError,ValueError):
             abort(503,'Update was not confirmed; refresh before trying again.')
+        if transfer_view and request.args.get('view') == 'network':
+            return redirect(url_for('home', view='network'))
         return redirect(url_for('incident',aid=aid))
 
     @app.post('/simulation')
@@ -264,7 +289,16 @@ def create_app(role, config, call, outbox=None, faults=None, identity=None):
             faults.set(request.form.get('preset'))
         except ValueError:
             abort(400)
+        if fault_controls:
+            return redirect(url_for('home', view='network'))
         return redirect(url_for('home'))
+
+    @app.post('/network-demo/report')
+    def network_sample():
+        if not fault_controls or role != 'sender':
+            abort(404)
+        enqueue(new_alert('MEDIUM', 'TEST ONLY: Network Lab transfer', 'Synthetic classroom'))
+        return redirect(url_for('home', view='network'))
 
     @app.get('/evidence')
     def evidence():

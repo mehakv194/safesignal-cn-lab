@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+{% from 'icons.html' import icon %}
+{% block content %}
+<div class="student-heading">
+  <div class="eyebrow">{{ 'LOCAL DEMO' if fault_controls else 'SIMULATION' }} · {{ 'STUDENT SENDER' if role=='sender' else 'RESPONDER DESK' }}</div>
+  <h1>Live Network Lab</h1>
+  <p>Follow a simulated report from the sender queue to the incident server over TLS/TCP.</p>
+  <a class="text-link" href="{{ '/responder/?view=network' if role=='sender' else '/sender/?view=network' }}" target="_blank" rel="noopener">Open {{ 'Responder' if role=='sender' else 'Student' }} lab in a new tab {{ icon('arrow') }}</a>
+</div>
+
+{% set presets = {'normal':'Normal connection', 'disconnect':'Temporary sender disconnect', 'ack_lost':'First receipt lost', 'delay':'Delayed receipt · 1.5 s'} %}
+{% if role=='sender' and fault_controls %}
+<section class="panel transfer-controls">
+  <h2>Connection controls</h2>
+  <p>Disconnect the sender link, then send a test report. Restore the link to watch the queue retry.</p>
+  <form class="transfer-buttons" method="post" action="{{ url_for('simulation') }}">
+    <input type="hidden" name="csrf" value="{{ session.csrf }}">
+    {% for name, label in presets.items() %}
+    <button class="button {{ 'secondary' if name!=preset }}" name="preset" value="{{ name }}" aria-pressed="{{ 'true' if name==preset else 'false' }}">{{ label }}</button>
+    {% endfor %}
+  </form>
+  <form method="post" action="{{ url_for('network_sample') }}">
+    <input type="hidden" name="csrf" value="{{ session.csrf }}">
+    <button class="button">{{ icon('plus') }}Send test report</button>
+  </form>
+</section>
+{% elif role=='sender' %}
+<a class="button secondary" href="{{ url_for('home') }}">{{ icon('plus') }}Go to report form</a>
+{% endif %}
+
+<p class="connection-text" data-transfer-poll-status role="status">Refreshes about once per second while this page is visible.</p>
+<div id="live-transfer" data-poll-region>
+<section class="panel transfer-panel">
+  <div class="panel-heading">
+    <div><h2>{{ 'Latest outgoing report' if role=='sender' else 'Latest server receipts' }}</h2>{% if fault_controls %}<p>Sender link simulation · {{ presets[preset] }}</p>{% endif %}</div>
+  </div>
+  {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+  {% if role=='sender' and rows %}
+    {% set row = rows[0] %}
+    {% set waiting = row.status=='QUEUED' and row.last_error %}
+    <p class="transfer-id">Incident ID <code>{{ row.alert_id }}</code></p>
+    <ol class="transfer-stages" aria-label="Report delivery stages">
+      <li class="recorded"><strong>Sender outbox</strong><span>Saved to SQLite</span></li>
+      <li class="{{ 'waiting' if waiting else ('recorded' if row.server_received_at) }}"><strong>TLS/TCP transfer</strong><span>{{ 'Retry scheduled' if waiting else ('Receipt returned' if row.server_received_at else ('Attempt in progress' if row.status=='SENDING' else 'Waiting for worker')) }}</span></li>
+      <li class="{{ 'recorded' if row.server_received_at }}"><strong>Incident server</strong><span>{{ 'Commit confirmed' if row.server_received_at else 'Awaiting server receipt' }}</span></li>
+      <li class="{{ 'recorded' if row.responder_acknowledged_at }}"><strong>Responder</strong><span>{{ 'Acknowledged by responder' if row.responder_acknowledged_at else 'Awaiting acknowledgment' }}</span></li>
+    </ol>
+    <p class="transfer-summary">Attempts <strong>{{ row.attempt_count }}</strong> · Retries <strong>{{ [row.attempt_count - 1, 0]|max }}</strong>{% if waiting %} · Next attempt from <strong>{{ row.next_attempt_at|retry_time }} UTC</strong>{% endif %}</p>
+    <h3>Recorded events <small>UTC</small></h3>
+    {% set labels = {'QUEUED':'Saved to sender outbox', 'SENDING':'Delivery attempt started', 'RETRY_SCHEDULED':'No successful receipt · retry scheduled', 'SERVER_RECEIVED':'Server receipt confirmed', 'DUPLICATE_SUPPRESSED':'Repeated incident ID · original receipt reused', 'RESPONDER_ACKNOWLEDGED':'Responder acknowledged the incident'} %}
+    <ol class="transfer-events">
+      {% for event in events|reverse %}
+      <li><span>{{ labels.get(event.event, event.event|replace('_', ' ')|capitalize) }}</span><time datetime="{{ event.recorded_at }}">{{ event.recorded_at[11:23] }}</time></li>
+      {% endfor %}
+    </ol>
+  {% elif role=='responder' %}
+    {% for row in rows %}
+    <article class="transfer-receipt">
+      <div>
+        <p class="transfer-id">Incident ID <code>{{ row.alert_id }}</code></p>
+        <p>Committed <time datetime="{{ row.server_received_at }}">{{ row.server_received_at[11:23] }} UTC</time>{% if row.responder_acknowledged_at %} · Acknowledged <time datetime="{{ row.responder_acknowledged_at }}">{{ row.responder_acknowledged_at[11:23] }} UTC</time>{% endif %}</p>
+      </div>
+      {% if current_user and row.incident_state=='REPORTED' %}
+      <form method="post" action="{{ url_for('update_incident', aid=row.alert_id, view='network') }}">
+        <input type="hidden" name="csrf" value="{{ session.csrf }}">
+        <input type="hidden" name="action" value="CLAIM">
+        <input type="hidden" name="team" value="{{ current_user.team }}">
+        <button class="button secondary">Acknowledge</button>
+      </form>
+      {% endif %}
+    </article>
+    {% else %}
+    {% if not error %}<p class="empty-state">No reports have reached the incident server yet. Reports waiting in the sender’s outbox appear here once committed.</p>{% endif %}
+    {% endfor %}
+  {% else %}
+    <p class="empty-state">Submit a simulated report to start the transfer trace.</p>
+  {% endif %}
+</section>
+</div>
+<p class="info-note">This trace shows recorded application events. Each transfer uses length-prefixed JSON over TLS/TCP. {% if fault_controls %}During the simulated disconnect, the report waits on disk until an attempt can reach the server. Browser internet stays connected for this demo.{% else %}Fault injection is disabled here. Use the local classroom lab to demonstrate a disconnected sender or a lost receipt.{% endif %}</p>
+{% endblock %}

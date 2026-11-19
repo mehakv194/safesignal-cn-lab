@@ -73,6 +73,7 @@ document.addEventListener('submit', async event => {
   }
 });
 let polling = false;
+const transferPollStatus = document.querySelector('[data-transfer-poll-status]');
 function refreshable(region) {
   return !region.contains(document.activeElement)
     && !region.querySelector('details[open], form[data-dirty], form[data-sending]');
@@ -84,16 +85,23 @@ setInterval(async () => {
   try {
     const response = await fetch(location.pathname + location.search, {cache:'no-store'});
     if (response.redirected) { location.assign(response.url); return; }
-    if (!response.ok) return;
+    if (!response.ok) throw new Error('Refresh unavailable');
     const html = new DOMParser().parseFromString(await response.text(),'text/html');
     regions.forEach(region => {
       const updated = html.getElementById(region.id);
       if (updated && refreshable(region)) region.replaceChildren(...updated.childNodes);
     });
     updateCharts();
-  } catch { /* Retain last observed state during a connection failure. */ }
+    if (transferPollStatus && transferPollStatus.textContent !== 'Live · refreshes about once per second while visible.') {
+      transferPollStatus.textContent = 'Live · refreshes about once per second while visible.';
+    }
+  } catch {
+    if (transferPollStatus && transferPollStatus.textContent !== 'Refresh interrupted. Showing the last confirmed update.') {
+      transferPollStatus.textContent = 'Refresh interrupted. Showing the last confirmed update.';
+    }
+  }
   finally { polling = false; }
-},5000);
+}, transferPollStatus ? 1000 : 5000);
 document.querySelector('#export-chart')?.addEventListener('click', () => {
   const image = document.querySelector('#comparison-chart');
   if (!image?.complete || !image.naturalWidth) return;

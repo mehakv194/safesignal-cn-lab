@@ -54,6 +54,27 @@ workspace path. Workaround using host pip:
 `python -m pip --python .venv/Scripts/python.exe install -r requirements.txt`.
 Loopback tests require network access; do not disable TLS to bypass restrictions.
 
+## Live network classroom demo
+
+The hosted Network Lab shows delivery attempts and committed receipts for
+simulated reports submitted through the normal Student dashboard. Fault controls
+are available in the classroom preview below.
+
+For a classroom demo with two preconfigured local accounts, run
+`.\.venv\Scripts\python scripts/run_app.py --classroom-demo` from the repository root.
+Open the [Student Lab](http://127.0.0.1:5070/sender/?view=network) and
+[Responder Lab](http://127.0.0.1:5070/responder/?view=network) in separate windows.
+Use `0000000001@mail.jiit.ac.in` / `Student-network-demo` and
+`0000000002@mail.jiit.ac.in` / `Responder-network-demo` respectively.
+After signing in, choose **Network Lab** from each dashboard.
+
+1. In the Student Lab, select **Temporary sender disconnect** and click **Send test report**.
+2. Point out the incident ID, the saved sender outbox entry, and the retry events. The Responder Lab does not show that ID yet.
+3. Select **Normal connection**. Match the incident ID and the server receipt on both screens, then click **Acknowledge** on the responder side.
+4. Select **First receipt lost** and send another report. The server commits the incident, and retrying with the same ID reuses its receipt.
+
+Keep the browser connected to the local app. This demo interrupts the internal sender link and displays recorded application events over TLS/TCP, with no raw packet capture.
+
 ## Five-minute demo
 
 1. Send a LOW **synthetic** alert. It is committed to the sender outbox before

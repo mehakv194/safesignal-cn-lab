@@ -317,3 +317,17 @@ dialog::backdrop { background: #123a2c66; backdrop-filter: blur(4px); }
 @media(max-width:650px) { .entry-shell { margin: 0; padding: 25px 18px; border-width: 4px; }.entry-shell > .quiet-pill { float: none; display: block; margin-top: 25px; width: fit-content; }.entry-grid { grid-template-columns: 1fr; }.entry-heading { padding-top: 35px; }.entry-shell .brand { font-size: 22px; } }
 .progress-ring[data-progress="0"] .ring-value { stroke: none; }
 @media(max-width:850px) { .sidebar-bottom { display:block; padding-top:0; }.sidebar-bottom .simulation-card,.sidebar-foot { display:none; } }
+.transfer-controls, .transfer-panel { margin: 16px 0; }
+.transfer-buttons { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
+.transfer-controls .button, .transfer-receipt .button { min-height: 44px; white-space: normal; }
+.transfer-id { overflow-wrap: anywhere; }
+.transfer-id code { color: #165c4d; }
+.transfer-stages { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 155px), 1fr)); gap: 8px; padding: 0; list-style: none; }
+.transfer-stages li { display: grid; gap: 5px; padding: 14px; border-radius: 12px; background: #f3f6f4; border-top: 3px solid #b3c4bc; }
+.transfer-stages .recorded { background: #e3f5ec; border-color: #1a8971; }
+.transfer-stages .waiting { background: #fff2d7; border-color: #ad6b16; }
+.transfer-events { list-style: none; padding: 0; margin-bottom: 0; }
+.transfer-events li, .transfer-receipt { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 20px; border-top: 1px solid var(--line); padding: 10px 0; }
+.transfer-events time, .transfer-receipt time { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.transfer-receipt > div { min-width: 0; }
+.transfer-receipt p { margin: 4px 0; }

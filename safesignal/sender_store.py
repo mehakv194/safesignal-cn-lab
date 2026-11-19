@@ -72,8 +72,11 @@ class Outbox:
 
     def failed(self, aid, delay, code):
         with self.connect() as db:
-            db.execute("UPDATE outbox SET status='QUEUED',next_attempt_at=?,last_error=? WHERE alert_id=? AND status='SENDING'",
-                       (time.time() + delay, code, aid))
+            updated = db.execute("UPDATE outbox SET status='QUEUED',next_attempt_at=?,last_error=? WHERE alert_id=? AND status='SENDING'",
+                                 (time.time() + delay, code, aid))
+            if updated.rowcount:
+                db.execute('INSERT INTO journey(alert_id,event,recorded_at) VALUES (?,?,?)',
+                           (aid, 'RETRY_SCHEDULED', now()))
 
     def confirmed(self, aid, reply):
         state = 'RESPONDER_ACKNOWLEDGED' if reply['code'] == 'RESPONDER_ACKNOWLEDGED' else 'SERVER_RECEIVED'
