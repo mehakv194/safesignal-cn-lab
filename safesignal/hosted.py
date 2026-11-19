@@ -74,7 +74,7 @@ def hosted_runtime(config, data_dir, enable_faults=False):
 
             @root.get('/')
             def home():
-                response = root.make_response(render_template('welcome.html',ephemeral_storage=settings.get('ephemeral_storage',False)))
+                response = root.make_response(render_template('welcome.html',ephemeral_storage=settings.get('ephemeral_storage',False),identity_enabled=bool(identity)))
                 response.headers['Cache-Control']='no-store'
                 return response
 

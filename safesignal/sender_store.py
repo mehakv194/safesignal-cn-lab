@@ -29,6 +29,7 @@ class Outbox:
                 if name not in columns:
                     db.execute(f'ALTER TABLE outbox ADD COLUMN {name} {definition}')
             db.execute("UPDATE outbox SET incident_state='ACKNOWLEDGED' WHERE status='RESPONDER_ACKNOWLEDGED' AND incident_state='REPORTED'")
+            db.execute('CREATE INDEX IF NOT EXISTS outbox_owner ON outbox(owner_user_id)')
 
     def connect(self):
         db = sqlite3.connect(self.path, timeout=5)
@@ -58,9 +59,10 @@ class Outbox:
             db.execute("INSERT INTO outbox(alert_id,payload,owner_user_id) VALUES(?,?,?)",(payload['alert_id'],json.dumps(payload),owner))
             db.execute('INSERT INTO journey(alert_id,event,recorded_at) VALUES(?,?,?)',(payload['alert_id'],'QUEUED',now()))
 
-    def rows(self):
+    def rows(self, owner=None):
         with self.connect() as db:
-            return [dict(r, alert=json.loads(r['payload'])) for r in db.execute('SELECT * FROM outbox ORDER BY rowid DESC')]
+            where,args=(' WHERE owner_user_id=?',(owner,)) if owner is not None else ('',())
+            return [dict(r, alert=json.loads(r['payload'])) for r in db.execute('SELECT * FROM outbox'+where+' ORDER BY rowid DESC',args)]
 
     def claim(self, aid):
         with self.connect() as db:

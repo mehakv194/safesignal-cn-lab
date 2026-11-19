@@ -25,7 +25,7 @@ def create_app(role, config, call, outbox=None, faults=None, identity=None):
             return raw_call(kind,payload,dict(sid=session.get('sid','')))
 
     def owned_rows():
-        return [r for r in outbox.rows() if not identity or r['owner_user_id']==g.user['id']]
+        return outbox.rows(g.user['id'] if identity else None)
 
     def enqueue(payload):
         if identity:
@@ -158,7 +158,8 @@ def create_app(role, config, call, outbox=None, faults=None, identity=None):
             rows, error = [], 'TLS backend unavailable. Saved sender alerts remain on disk.'
         if error and role=='responder':
             abort(503)
-        return render_template('home.html', role=role, rows=rows, error=error, severities=SEVERITIES,
+        template='student_home.html' if identity and role=='sender' and request.args.get('view','overview')=='overview' else 'home.html'
+        return render_template(template, role=role, rows=rows, error=error, severities=SEVERITIES,
                                faults=faults, preset=faults.preset() if faults else 'normal',
                                offset=request.args.get('offset', '0'), reachable=reachable,overview=overview,
                                view=request.args.get('view','overview'))
@@ -273,6 +274,12 @@ def create_app(role, config, call, outbox=None, faults=None, identity=None):
         return redirect(url_for('home'))
 
     if identity:
+        @app.get('/walks')
+        def my_walks():
+            if role!='sender':
+                abort(403)
+            return render_template('walks_pending.html')
+
         @app.route('/register',methods=['GET','POST'])
         def register():
             error=None
@@ -281,6 +288,8 @@ def create_app(role, config, call, outbox=None, faults=None, identity=None):
                 if not identity.limit('register',request.form.get('email','').lower().strip()[:254],request.remote_addr or ''):
                     abort(429)
                 try:
+                    if request.form.get('password') != request.form.get('confirm_password'):
+                        raise ValueError('Passwords must match.')
                     identity.register(request.form.get('email',''),request.form.get('password',''))
                     message='If eligible, a verification challenge has been sent. Check your inbox.'
                 except ValueError as exc:

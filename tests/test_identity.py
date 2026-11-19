@@ -180,6 +180,9 @@ def test_real_runtime_verified_signup_and_restore(tmp_path):
     box=Outbox(tmp_path/'outbox.sqlite');box.enqueue(legacy)
     with hosted_runtime(config,tmp_path) as app:
         c=Client(app,Response)
+        landing=c.get('/',base_url='https://campus.example')
+        assert 'Individual verified accounts' in landing.text
+        assert 'shared demo sender queue' not in landing.text
         def get(path): return c.get('/sender/'+path,base_url='https://campus.example')
         def post(path,fields):
             page=get(path)
@@ -187,7 +190,7 @@ def test_real_runtime_verified_signup_and_restore(tmp_path):
             return c.post('/sender/'+path,base_url='https://campus.example',data=dict(csrf=csrf,**fields))
         assert 'Access token' not in get('login').text
         email='2408030009@mail.jiit.ac.in'
-        assert post('register',dict(email=email,password='correct-password-123',role='responder')).status_code==200
+        assert post('register',dict(email=email,password='correct-password-123',confirm_password='correct-password-123',role='responder')).status_code==200
         assert post('login',dict(email=email,password='correct-password-123')).status_code==200
         assert 'Email verified' in post('verify',dict(challenge=mail[-1][2])).text
         assert post('login',dict(email=email,password='correct-password-123')).status_code==302

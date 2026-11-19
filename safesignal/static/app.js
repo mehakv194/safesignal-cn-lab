@@ -10,8 +10,21 @@ document.addEventListener('input', event => {
   if (form) form.dataset.dirty = 'true';
 });
 document.addEventListener('click', event => {
+  const toggle = event.target.closest('[data-toggle-password]');
+  if (toggle) {
+    const input = toggle.closest('form').querySelector('input[name="password"]');
+    const visible = input.type === 'password';
+    input.type = visible ? 'text' : 'password';
+    toggle.textContent = visible ? 'Hide password' : 'Show password';
+    toggle.setAttribute('aria-pressed', String(visible));
+  }
   if (event.target.closest('[data-open-report]')) document.querySelector('#report-dialog')?.showModal();
   if (event.target.closest('[data-close-dialog]')) document.querySelector('#report-dialog')?.close();
+});
+document.addEventListener('submit', event => {
+  if (event.target.method.toLowerCase() !== 'post') return;
+  const feedback = document.querySelector('#action-feedback');
+  if (feedback) feedback.textContent = navigator.onLine ? 'Sending — waiting for server confirmation…' : 'Offline — reconnect before submitting. Delivery is not confirmed.';
 });
 let polling = false;
 setInterval(async () => {

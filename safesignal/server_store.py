@@ -32,6 +32,7 @@ class Store:
             if 'detail' not in {r[1] for r in db.execute('PRAGMA table_info(audit)')}:
                 db.execute("ALTER TABLE audit ADD COLUMN detail TEXT NOT NULL DEFAULT ''")
             db.execute("UPDATE alerts SET incident_state='ACKNOWLEDGED',assigned_to='Campus Response Desk',assigned_team='Campus Safety' WHERE responder_acknowledged_at IS NOT NULL AND incident_state='REPORTED'")
+            db.execute('CREATE INDEX IF NOT EXISTS alerts_owner ON alerts(owner_user_id,server_received_at)')
 
     def connect(self):
         db = sqlite3.connect(self.path, timeout=5)

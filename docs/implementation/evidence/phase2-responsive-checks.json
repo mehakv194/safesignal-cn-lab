@@ -1,0 +1,160 @@
+{
+  "home": [
+    {
+      "scroll": 305,
+      "smallTargets": [],
+      "width": 320
+    },
+    {
+      "scroll": 345,
+      "smallTargets": [],
+      "width": 360
+    },
+    {
+      "scroll": 375,
+      "smallTargets": [],
+      "width": 390
+    },
+    {
+      "scroll": 415,
+      "smallTargets": [],
+      "width": 430
+    },
+    {
+      "scroll": 753,
+      "smallTargets": [],
+      "width": 768
+    },
+    {
+      "scroll": 1009,
+      "smallTargets": [],
+      "width": 1024
+    },
+    {
+      "scroll": 1425,
+      "smallTargets": [],
+      "width": 1440
+    }
+  ],
+  "final": [
+    {
+      "page": "queue",
+      "scroll": 305,
+      "smallTargets": [],
+      "width": 320
+    },
+    {
+      "page": "queue",
+      "scroll": 345,
+      "smallTargets": [],
+      "width": 360
+    },
+    {
+      "page": "queue",
+      "scroll": 375,
+      "smallTargets": [],
+      "width": 390
+    },
+    {
+      "page": "queue",
+      "scroll": 415,
+      "smallTargets": [],
+      "width": 430
+    },
+    {
+      "page": "queue",
+      "scroll": 753,
+      "smallTargets": [],
+      "width": 768
+    },
+    {
+      "page": "queue",
+      "scroll": 1009,
+      "smallTargets": [],
+      "width": 1024
+    },
+    {
+      "page": "queue",
+      "scroll": 1425,
+      "smallTargets": [],
+      "width": 1440
+    },
+    {
+      "inputFonts": [
+        "16px",
+        "16px",
+        "16px"
+      ],
+      "page": "login",
+      "scroll": 305,
+      "smallTargets": [],
+      "width": 320
+    },
+    {
+      "inputFonts": [
+        "16px",
+        "16px",
+        "16px"
+      ],
+      "page": "login",
+      "scroll": 345,
+      "smallTargets": [],
+      "width": 360
+    },
+    {
+      "inputFonts": [
+        "16px",
+        "16px",
+        "16px"
+      ],
+      "page": "login",
+      "scroll": 375,
+      "smallTargets": [],
+      "width": 390
+    },
+    {
+      "inputFonts": [
+        "16px",
+        "16px",
+        "16px"
+      ],
+      "page": "login",
+      "scroll": 415,
+      "smallTargets": [],
+      "width": 430
+    },
+    {
+      "inputFonts": [
+        "16px",
+        "16px",
+        "16px"
+      ],
+      "page": "login",
+      "scroll": 753,
+      "smallTargets": [],
+      "width": 768
+    },
+    {
+      "inputFonts": [
+        "16px",
+        "16px",
+        "16px"
+      ],
+      "page": "login",
+      "scroll": 1024,
+      "smallTargets": [],
+      "width": 1024
+    },
+    {
+      "inputFonts": [
+        "16px",
+        "16px",
+        "16px"
+      ],
+      "page": "login",
+      "scroll": 1440,
+      "smallTargets": [],
+      "width": 1440
+    }
+  ]
+}
