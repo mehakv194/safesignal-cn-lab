@@ -56,3 +56,34 @@ No application rollback needed: tracked runtime remains at baseline. Audit artif
 Decision: PASS for Gate 0 audit/baseline; not release approval.
 User approval to begin Phase 1: **PENDING**.
 Deployment approval for v2: **NOT GIVEN**.
+
+---
+
+# Phase 1 and Phase 2 — Approved execution update
+
+Date: 19 November 2026. Branch: codex/v2-identity-mobile.
+User approved completing both phases in the message asking to publish Phase 0 and complete Phases 1 and 2. This supersedes the earlier pending Phase 1 approval above. It does not authorize deployment of v2 or Phase 3.
+
+Phase 0 publication: main commit 2202136, pushed to GitHub. Documentation only; runtime source unchanged.
+
+## Phase 1 — PASS (local implementation)
+
+Implementation commit c6b99c5. Individual email/password accounts, exact enrollment-email validation, actual challenge consumption with local captured email, Argon2id, revocable sessions, reset/change password, restricted responder CLI, scoped HTTP/socket access, owner-bound queue intents and legacy segregation implemented.
+
+Tests: `.venv/Scripts/python.exe -m pytest -q --basetemp=C:/Users/mehak/.codex/visualizations/2026/11/18/01a1eef0-be7d-75d1-b1ed-8f0bbffef830/v2-phase1-final` → **42 passed in 28.67s**.
+
+Files, privacy/migration checks, evidence and limitations: [PHASE_1.md](PHASE_1.md). Backup/restore, mailbox gating, owner/role denial, session revocation and baseline networking tests passed. No real SMTP/inbox proof; hosted signup disables without transport. Approval to begin Phase 2: APPROVED in the same user instruction.
+
+## Phase 2 — PASS (local implementation / responsive checks)
+
+Implementation commit 7229354. Mobile-first student Home, phone bottom navigation, desktop role navigation, readable onboarding/profile, real own-incident lists and responsive responder functions implemented; original local lab shell retained. SafeWalk page truthfully identifies Phase 3 as pending.
+
+Final tests: `.venv/Scripts/python.exe -m pytest -q --basetemp=C:/Users/mehak/.codex/visualizations/2026/11/18/01a1eef0-be7d-75d1-b1ed-8f0bbffef830/v2-phases12-releasecheck` → **44 passed in 32.01s**, no failures/skips.
+
+Home/login/queue checked at all seven required widths; no overflow or undersized visible controls in final measured pages; inputs 16px. Keyboard focus and password toggle checked. A real synthetic student→responder→resolution journey passed in browser. Full files/evidence/acceptance/rollback: [PHASE_2.md](PHASE_2.md).
+
+Remaining: real mail delivery and production/staging approval, real-device/screen-reader QA, Phases 3–7. No new public app deployment; Phase 1/2 remain on feature branch. No existing user database was migrated in development; tests/preview use isolated data.
+
+Decision: PASS for local Gates 1 and 2, with stated release/device limits. Not a production readiness verdict.
+User approval to begin Phase 3: **PENDING**.
+Deployment approval for Phase 1/2: **NOT GIVEN**.
