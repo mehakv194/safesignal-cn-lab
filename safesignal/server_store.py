@@ -30,6 +30,7 @@ class Store:
                 'last_note': "TEXT NOT NULL DEFAULT ''", 'resolved_at': 'TEXT', 'updated_at': 'TEXT',
                 'owner_user_id': 'TEXT',
                 'followup_disposition': "TEXT NOT NULL DEFAULT ''",
+                'review_pending':'INTEGER NOT NULL DEFAULT 0',
             }.items():
                 if name not in columns:
                     db.execute(f'ALTER TABLE alerts ADD COLUMN {name} {definition}')
@@ -76,7 +77,7 @@ class Store:
         return dict(status='OK', code=row['status'], **json.loads(row['payload']),
                     server_received_at=row['server_received_at'],
                     responder_acknowledged_at=row['responder_acknowledged_at'],
-                    **{k: row[k] for k in ('incident_state','assigned_to','assigned_team','last_note','resolved_at','updated_at','followup_disposition')})
+                    **{k: row[k] for k in ('incident_state','assigned_to','assigned_team','last_note','resolved_at','updated_at','followup_disposition','review_pending')})
 
     def scope(self, principal):
         if principal is None:

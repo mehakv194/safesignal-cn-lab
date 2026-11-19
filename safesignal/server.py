@@ -32,13 +32,14 @@ class AlertServer(socketserver.ThreadingTCPServer):
     allow_reuse_address = True
     daemon_threads = True
 
-    def __init__(self, address, context, store, sender_token, responder_token, faults=None, identity=None, walks=None):
+    def __init__(self, address, context, store, sender_token, responder_token, faults=None, identity=None, walks=None, rooms=None):
         if not sender_token or not responder_token or sender_token == responder_token:
             raise ValueError('Distinct nonempty role tokens required')
         self.context, self.store = context, store
         self.faults = faults
         self.identity = identity
         self.walks = walks
+        self.rooms = rooms
         self.tokens = {'sender': sender_token, 'responder': responder_token}
         self.rate_lock = threading.Lock()
         self.rates = {}
@@ -59,7 +60,8 @@ class AlertServer(socketserver.ThreadingTCPServer):
                         'LIST_ALERTS': 'responder', 'ACK_ALERT': 'responder',
                         'UPDATE_INCIDENT':'responder','DASHBOARD':'responder',
                         'GET_AUDIT': ('sender','responder'), 'HEALTH': 'sender',
-                        'WALK_START':'sender','WALK_GET':'sender','WALK_LIST':'sender','WALK_ACTION':'sender'}
+                        'WALK_START':'sender','WALK_GET':'sender','WALK_LIST':'sender','WALK_ACTION':'sender',
+                        'ROOM_GET':('sender','responder'),'ROOM_SEND':('sender','responder'),'ROOM_FEEDBACK':('sender','responder')}
             permitted = required.get(kind, ())
             if role is None or (role not in permitted if isinstance(permitted,tuple) else permitted != role):
                 return dict(status='ERROR', code='UNAUTHORIZED', request_id=rid)
@@ -92,6 +94,15 @@ class AlertServer(socketserver.ThreadingTCPServer):
                 UUID(payload['alert_id'])
             if kind == 'HEALTH':
                 result = dict(status='OK', code='HEALTHY')
+            elif kind.startswith('ROOM_'):
+                if not self.rooms or not principal or principal.get('job'):
+                    raise ValueError('Room unavailable')
+                if kind=='ROOM_GET':
+                    result=self.rooms.get(principal,payload['alert_id'],payload.get('before',0))
+                elif kind=='ROOM_SEND':
+                    result=self.rooms.send(principal,payload['alert_id'],payload['client_uuid'],payload['body'])
+                else:
+                    result=self.rooms.feedback(principal,payload['alert_id'],payload['client_uuid'],payload['kind'],payload['body'])
             elif kind.startswith('WALK_'):
                 if not self.walks or not principal or principal.get('job'):
                     raise ValueError('Walks unavailable')

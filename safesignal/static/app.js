@@ -10,6 +10,13 @@ document.addEventListener('input', event => {
   if (form) form.dataset.dirty = 'true';
 });
 document.addEventListener('click', event => {
+  const quick = event.target.closest('[data-quick-reply]');
+  if (quick) {
+    const field = quick.closest('form').querySelector('textarea[name="body"]');
+    field.value = quick.dataset.quickReply;
+    field.dispatchEvent(new Event('input', {bubbles:true}));
+    field.focus();
+  }
   const toggle = event.target.closest('[data-toggle-password]');
   if (toggle) {
     const input = toggle.closest('form').querySelector('input[name="password"]');
@@ -26,11 +33,39 @@ document.addEventListener('submit', event => {
   const feedback = document.querySelector('#action-feedback');
   if (feedback) feedback.textContent = navigator.onLine ? 'Sending — waiting for server confirmation…' : 'Offline — reconnect before submitting. Delivery is not confirmed.';
 });
+document.addEventListener('submit', async event => {
+  const form=event.target;
+  if (!form.matches('[data-room-send]')) return;
+  event.preventDefault();
+  if (form.dataset.sending) return;
+  const status=form.querySelector('[data-message-status]');
+  if (!navigator.onLine) { status.textContent='Not sent — reconnect to submit. Draft retained.'; return; }
+  form.dataset.sending='true';
+  status.textContent='Pending — waiting for a server receipt…';
+  const button=form.querySelector('[type="submit"]');
+  button.disabled=true;
+  try {
+    const response=await fetch(form.action,{method:'POST',headers:{Accept:'application/json'},body:new URLSearchParams(new FormData(form))});
+    const result=await response.json();
+    if (!response.ok || result.status!=='OK') throw new Error('unconfirmed');
+    form.querySelector('textarea[name="body"]').value='';
+    form.querySelector('[name="client_uuid"]').value=result.next_key;
+    delete form.dataset.dirty;
+    status.textContent='Saved on server. This is not a human read receipt.';
+    const globalStatus=document.querySelector('#action-feedback');
+    if (globalStatus) globalStatus.textContent='Message saved on server.';
+  } catch {
+    status.textContent='Not confirmed. Draft retained — retry sends the same message ID.';
+    const globalStatus=document.querySelector('#action-feedback');
+    if (globalStatus) globalStatus.textContent='Message not confirmed. Draft retained.';
+  }
+  finally { delete form.dataset.sending; button.disabled=false; }
+});
 let polling = false;
 setInterval(async () => {
-  const regions = [...document.querySelectorAll('[data-poll-region]')];
-  if (polling || document.hidden || !regions.length || regions.some(region =>
-    region.contains(document.activeElement) || region.querySelector('details[open], form[data-dirty]'))) return;
+  const regions = [...document.querySelectorAll('[data-poll-region]')].filter(region =>
+    !region.contains(document.activeElement) && !region.querySelector('details[open], form[data-dirty],form[data-sending]'));
+  if (polling || document.hidden || !regions.length) return;
   polling = true;
   try {
     const response = await fetch(location.pathname + location.search, {cache:'no-store'});

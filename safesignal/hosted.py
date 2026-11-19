@@ -20,6 +20,7 @@ from .tls import create_certificate, client_context, server_context
 from .web import create_app
 from .identity import Identity, configured_mail
 from .walks import Walks
+from .rooms import Rooms
 
 
 @contextmanager
@@ -56,8 +57,9 @@ def hosted_runtime(config, data_dir, enable_faults=False):
         context = client_context(certs)
         store=Store(data/'server.sqlite')
         walks=Walks(identity,store) if identity else None
+        rooms=Rooms(identity,store) if identity else None
         with AlertServer(('127.0.0.1', 0), server_context(certs), store,
-                         settings['sender_token'], settings['responder_token'], faults,identity,walks) as server:
+                         settings['sender_token'], settings['responder_token'], faults,identity,walks,rooms) as server:
             server_thread = threading.Thread(target=server.serve_forever, daemon=True)
             server_thread.start()
             def caller(role):

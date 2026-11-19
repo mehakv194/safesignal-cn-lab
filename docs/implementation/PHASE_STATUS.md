@@ -99,3 +99,5 @@ User subsequently explicitly requested production deployment of Phase 1–2, imp
 Phase 1–2 deployed on Render Free: source f7aec68, deployment dep-dbvipf3l550s73fvbjlg; Live observed and public account page verified. Signup remains disabled without real email delivery; no verification bypass.
 
 Phase 3: PASS. Full suite 50 passed in 36.65s using v2-phase3-verified basetemp. Real walk start/safe/help browser proof captured; queue/TLS, ownership, idempotency, timer/restart and late response tests pass. See PHASE_3.md for files, rollback and limits. Phase 4 execution: APPROVED by the same user request.
+
+Phase 4: PASS. Full suite 55 passed in 43.27s using v2-phase4-verified basetemp. Real private two-session thread, preserved draft during incoming polling, feedback/review/confirmation demonstrated. Owner/team/TLS/CSRF/XSS/idempotency/quota tests pass; lifecycle never silently regressed. Details: PHASE_4.md. Phase 5 execution: APPROVED by the same user request. Real mail and physical-device keyboard proof still pending release/device work.

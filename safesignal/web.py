@@ -3,7 +3,7 @@ import secrets
 import time
 from uuid import uuid4
 
-from flask import Flask, abort, redirect, render_template, request, session, url_for, send_from_directory, g
+from flask import Flask, abort, redirect, render_template, request, session, url_for, send_from_directory, g, jsonify
 from pathlib import Path
 from datetime import datetime, timezone
 
@@ -34,6 +34,16 @@ def create_app(role, config, call, outbox=None, faults=None, identity=None):
             identity.reconcile(outbox)
         else:
             outbox.enqueue(payload)
+
+    def operation_key(purpose,aid,rotate=False):
+        keys=dict(session.get('operation_keys',{}))
+        name=purpose+aid
+        if rotate or name not in keys:
+            if len(keys)>=12:
+                keys.pop(next(iter(keys)))
+            keys[name]=str(uuid4())
+            session['operation_keys']=keys
+        return keys[name]
 
     @app.context_processor
     def deployment_context():
@@ -197,7 +207,17 @@ def create_app(role, config, call, outbox=None, faults=None, identity=None):
         except (OSError,EOFError,ValueError):
             if reply is None:
                 abort(503,'The incident server is unavailable. Please try again.')
-        return render_template('incident.html',incident=reply,events=events[-8:],events_source=events_source,view='incidents')
+        room=None
+        if identity:
+            try:
+                room=call('ROOM_GET',dict(alert_id=aid,before=max(0,int(request.args.get('before','0')))))
+                if room.get('status')!='OK':
+                    room=None
+            except (OSError,EOFError,ValueError):
+                pass
+        return render_template('incident.html',incident=reply,events=events[-8:],events_source=events_source,view='incidents',
+                               room=room,message_key=operation_key('message',aid) if identity else None,
+                               feedback_key=operation_key('feedback',aid) if identity else None)
 
     @app.post('/examples')
     def examples():
@@ -285,6 +305,32 @@ def create_app(role, config, call, outbox=None, faults=None, identity=None):
         return redirect(url_for('home'))
 
     if identity:
+        @app.post('/incident/<aid>/message')
+        def send_message(aid):
+            payload=dict(alert_id=aid,client_uuid=request.form.get('client_uuid'),body=request.form.get('body',''))
+            try:
+                reply=call('ROOM_SEND',payload)
+            except (OSError,EOFError,ValueError):
+                return jsonify(status='ERROR',code='UNCONFIRMED'),503
+            if reply.get('status')!='OK':
+                return jsonify(reply),404 if reply.get('code')=='NOT_FOUND' else 400
+            key=operation_key('message',aid,True)
+            if request.accept_mimetypes.best=='application/json':
+                return jsonify(dict(reply,next_key=key))
+            return redirect(url_for('incident',aid=aid))
+
+        @app.post('/incident/<aid>/feedback')
+        def incident_feedback(aid):
+            try:
+                reply=call('ROOM_FEEDBACK',dict(alert_id=aid,client_uuid=request.form.get('client_uuid'),
+                                               kind=request.form.get('kind'),body=request.form.get('body','')))
+            except (OSError,EOFError,ValueError):
+                abort(503,'Feedback not confirmed. Refresh before retrying.')
+            if reply.get('status')!='OK':
+                abort(404 if reply.get('code')=='NOT_FOUND' else 400,'Feedback rejected for this state or role. Refresh the case.')
+            operation_key('feedback',aid,True)
+            return redirect(url_for('incident',aid=aid))
+
         def walk_call(kind,payload=None):
             if role!='sender':
                 abort(403)
