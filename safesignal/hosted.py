@@ -121,6 +121,9 @@ def main():
     config['allowed_hosts'] = tuple(hosts)
     config['identity'] = True
     config['mail'] = configured_mail() if os.environ.get('SAFESIGNAL_REGISTRATION_ENABLED')=='1' else None
+    invite_file = Path(__file__).resolve().with_name('hosted_invite.json')
+    if invite_file.is_file():
+        config['student_invite'] = json.loads(invite_file.read_text(encoding='utf-8'))
     config['ephemeral_storage'] = os.environ.get('SAFESIGNAL_EPHEMERAL_STORAGE')=='1'
     data_dir = os.environ['SAFESIGNAL_DATA_DIR']
     with hosted_runtime(config, data_dir, os.environ.get('ENABLE_DEMO_FAULTS') == '1') as app:

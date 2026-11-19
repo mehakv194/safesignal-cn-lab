@@ -81,7 +81,7 @@ def create_app(role, config, call, outbox=None, faults=None, identity=None):
                 abort(400)
         if identity:
             g.user=identity.user(session.get('sid',''))
-            public=('login','static','register','verify','recovery','reset_password')
+            public=('login','static','register','verify','recovery','reset_password','redeem_invite')
             if request.endpoint not in public and (not g.user or g.user['role'] != ('student' if role=='sender' else 'responder')):
                 return redirect(url_for('login'))
             if request.endpoint in ('evidence','evidence_file') and g.user and g.user['role']!='responder':
@@ -408,6 +408,26 @@ def create_app(role, config, call, outbox=None, faults=None, identity=None):
                 link=next(l for l in result['links'] if l['kind']=='HELP')
                 return redirect(url_for('incident',aid=link['alert_id']))
             return redirect(url_for('walk_detail',wid=wid))
+
+        @app.route('/activate-demo', methods=['GET', 'POST'])
+        def redeem_invite():
+            invite = config.get('student_invite')
+            if role != 'sender' or not config.get('hosted') or not invite:
+                abort(404)
+            error = None
+            if request.method == 'POST':
+                email = request.form.get('email', '').strip().lower()
+                if not identity.limit('student-invite', email, request.remote_addr or ''):
+                    abort(429)
+                try:
+                    password = request.form.get('password', '')
+                    if password != request.form.get('confirm_password'):
+                        raise ValueError('Passwords must match.')
+                    identity.redeem_invite(email, request.form.get('code', ''), password, invite)
+                    return redirect(url_for('login'))
+                except ValueError as exc:
+                    error = str(exc)
+            return render_template('student_invite.html', error=error)
 
         @app.route('/register',methods=['GET','POST'])
         def register():

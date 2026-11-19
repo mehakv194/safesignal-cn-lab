@@ -129,6 +129,30 @@ class Identity:
                        (str(uuid4()), email, hashed, self.clock()))
         self.challenge(email, 'VERIFY')
 
+    def redeem_invite(self, email, code, password, invite):
+        email = email_address(email)
+        code = code.strip()
+        proof = digest(f'safesignal-invite-v1:{email}:{code}')
+        if (len(code) != 43 or self.clock() >= invite['expires_at']
+                or not hmac.compare_digest(proof, invite['commitment'])):
+            raise ValueError('Invalid or expired invitation.')
+        self.password(password)
+        password_hash = self.hash_password(password)
+        account_id = str(uuid4())
+        with self.connect() as db:
+            created = db.execute(
+                '''INSERT INTO users(id,email,password_hash,created,verified)
+                   VALUES(?,?,?,?,1) ON CONFLICT(email) DO NOTHING''',
+                (account_id, email, password_hash, self.clock()),
+            ).rowcount
+            if not created:
+                raise ValueError('This invitation has already been used. Sign in with your chosen password.')
+            db.execute(
+                '''INSERT INTO security_events(event,result,stamp,actor_id,reason_code)
+                   VALUES(?,?,?,?,?)''',
+                ('STUDENT_INVITE_REDEEMED', 'ALLOWED', self.clock(), account_id, 'MAILBOX_CODE'),
+            )
+
     def challenge(self, email, purpose):
         email = email_address(email)
         with self.connect() as db:
