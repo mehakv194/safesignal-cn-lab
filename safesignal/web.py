@@ -19,6 +19,7 @@ def create_app(role, config, call, outbox=None, faults=None, identity=None):
                       SESSION_COOKIE_SECURE=config.get('hosted', False),
                       SESSION_COOKIE_PATH='/' + role if config.get('hosted') else '/')
     login_attempts = []
+    demo_login = config.get('demo_accounts') is not None
     evidence_dir = Path(config.get('evidence_dir', 'artifacts'))
     raw_call = call
     local_lab=bool(identity and config.get('trust_lab') and not config.get('hosted',False)
@@ -51,7 +52,7 @@ def create_app(role, config, call, outbox=None, faults=None, identity=None):
 
     @app.context_processor
     def deployment_context():
-        return {'trust_lab_enabled':local_lab,'identity_enabled':bool(identity),'current_user':getattr(g,'user',None),'hosted': config.get('hosted', False), 'combined':config.get('combined',False),
+        return {'trust_lab_enabled':local_lab,'demo_login':demo_login,'identity_enabled':bool(identity),'current_user':getattr(g,'user',None),'hosted': config.get('hosted', False), 'combined':config.get('combined',False),
                 'ephemeral_storage':config.get('ephemeral_storage',False), 'role':role,'categories':CATEGORIES,
                 'severities':SEVERITIES,'incident_states':INCIDENT_STATES,'teams':((g.user['team'],) if identity and getattr(g,'user',None) and g.user['role']=='responder' else RESPONSE_TEAMS),
                 'today':datetime.now(timezone.utc).strftime('%d %b %Y'), 'local_role_url':
@@ -75,6 +76,9 @@ def create_app(role, config, call, outbox=None, faults=None, identity=None):
             abort(400)
         if config.get('hosted') and not request.is_secure:
             abort(400)
+        if demo_login and (request.endpoint in ('register','verify','recovery','reset_password','redeem_invite')
+                           or (request.endpoint == 'profile' and request.method == 'POST')):
+            abort(404)
         session.setdefault('csrf', secrets.token_urlsafe(24))
         if request.method == 'POST':
             if not hmac.compare_digest(session['csrf'], request.form.get('csrf', '')):
@@ -115,7 +119,8 @@ def create_app(role, config, call, outbox=None, faults=None, identity=None):
                     session.clear()
                     session.update(sid=sid,role=role,csrf=secrets.token_urlsafe(24))
                     return redirect(url_for('home'))
-                error='Sign-in failed. Check your credentials, verification and dashboard role.'
+                error=('Sign-in failed. Check your email, password and dashboard role.' if demo_login
+                       else 'Sign-in failed. Check your credentials, verification and dashboard role.')
             return render_template('identity.html',mode='login',error=error)
         if request.method == 'POST':
             login_attempts[:] = [t for t in login_attempts if time.monotonic() - t < 60]

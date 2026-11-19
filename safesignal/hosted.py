@@ -27,6 +27,11 @@ from .rooms import Rooms
 def hosted_runtime(config, data_dir, enable_faults=False):
     """One process, one disk, one outbox worker; never use horizontal replicas."""
     data = Path(data_dir)
+    demo_accounts = config.get('demo_accounts')
+    if demo_accounts is not None:
+        if not config.get('identity') or set(demo_accounts) != {'student', 'responder'}:
+            raise ValueError('Demo mode requires exactly one student and one responder account')
+        data /= 'password-demo'
     data.mkdir(parents=True, exist_ok=True)
     if config.get('identity'):
         for name in ('server.sqlite','outbox.sqlite'):
@@ -50,6 +55,8 @@ def hosted_runtime(config, data_dir, enable_faults=False):
     enable_faults=enable_faults and not settings['hosted']
     faults = Faults(data / 'faults.json', enable_faults)
     identity = Identity(data/'server.sqlite',config['session_secret'],mail=config.get('mail',configured_mail())) if config.get('identity') else None
+    if demo_accounts is not None:
+        identity.seed_demo_accounts(demo_accounts)
     if enable_faults:
         faults.set('normal')
     with tempfile.TemporaryDirectory() as certs:
@@ -80,7 +87,7 @@ def hosted_runtime(config, data_dir, enable_faults=False):
 
             @root.get('/')
             def home():
-                response = root.make_response(render_template('welcome.html',ephemeral_storage=settings.get('ephemeral_storage',False),identity_enabled=bool(identity)))
+                response = root.make_response(render_template('welcome.html',ephemeral_storage=settings.get('ephemeral_storage',False),identity_enabled=bool(identity),demo_login=demo_accounts is not None))
                 response.headers['Cache-Control']='no-store'
                 return response
 
@@ -127,6 +134,9 @@ def main():
     responder_invite = invite_file.with_name('hosted_responder_invite.json')
     if responder_invite.is_file():
         config['responder_invite'] = json.loads(responder_invite.read_text(encoding='utf-8'))
+    demo_file = invite_file.with_name('hosted_demo_accounts.json')
+    if demo_file.is_file():
+        config['demo_accounts'] = json.loads(demo_file.read_text(encoding='utf-8'))
     config['ephemeral_storage'] = os.environ.get('SAFESIGNAL_EPHEMERAL_STORAGE')=='1'
     data_dir = os.environ['SAFESIGNAL_DATA_DIR']
     with hosted_runtime(config, data_dir, os.environ.get('ENABLE_DEMO_FAULTS') == '1') as app:

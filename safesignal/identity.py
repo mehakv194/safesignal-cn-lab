@@ -91,6 +91,22 @@ class Identity:
     def connect(self):
         return connection(self.path)
 
+    def seed_demo_accounts(self, password_hashes):
+        with self.connect() as db:
+            for role, email, team in (
+                ('student', '0000000001@mail.jiit.ac.in', ''),
+                ('responder', '0000000002@mail.jiit.ac.in', 'Medical Team'),
+            ):
+                hashed = password_hashes[role]
+                if not hashed.startswith('$argon2id$'):
+                    raise ValueError('Demo accounts require Argon2id password hashes')
+                updated = db.execute('''INSERT INTO users(id,email,password_hash,role,verified,team,created)
+                    VALUES(?,?,?,?,1,?,?) ON CONFLICT(email) DO UPDATE SET password_hash=excluded.password_hash
+                    WHERE users.password_hash != excluded.password_hash''',
+                    (str(uuid4()), email, hashed, role, team, self.clock()))
+                if updated.rowcount:
+                    db.execute('DELETE FROM sessions WHERE user_id=(SELECT id FROM users WHERE email=?)', (email,))
+
     def hash_password(self,value):
         with self.password_slots:
             return self.hasher.hash(value)
