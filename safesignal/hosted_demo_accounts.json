@@ -1,0 +1,4 @@
+{
+  "student": "$argon2id$v=19$m=65536,t=3,p=4$7K12zrga8w6VViLhOjU6RQ$O1FDuDlxJSILr4tWst8NpYaohGbzQsHZI9/APIvoZks",
+  "responder": "$argon2id$v=19$m=65536,t=3,p=4$+R3KPerH0mvSkFyjN2fmPg$BuIUXgunEEZvwYjm9PlZ/p/xr7s9V9cgs+pZ4QKYjq4"
+}

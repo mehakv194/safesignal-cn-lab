@@ -26,7 +26,7 @@ def test_actual_waitress_ingress_preserves_https_and_rejects_forwarded_host(monk
                 assert reply.status==200
                 assert 'Secure' in reply.headers['Set-Cookie']
                 page=reply.read()
-                assert b'Enrollment email' in page and b'Access token' not in page
+                assert b'name="email"' in page and b'name="password"' in page and b'Access token' not in page
             for headers in ({'Host':'campus.example'},{'Host':'evil.example','X-Forwarded-Proto':'https'}):
                 with pytest.raises(urllib.error.HTTPError) as error:
                     urllib.request.urlopen(urllib.request.Request(url,headers=headers),timeout=5)
