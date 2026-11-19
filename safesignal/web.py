@@ -2,7 +2,7 @@ import hmac
 import secrets
 import time
 
-from flask import Flask, abort, redirect, render_template, request, session, url_for, send_from_directory
+from flask import Flask, abort, redirect, render_template, request, session, url_for, send_from_directory, g
 from pathlib import Path
 from datetime import datetime, timezone
 
@@ -10,7 +10,7 @@ from .models import SEVERITIES, CATEGORIES, INCIDENT_STATES, RESPONSE_TEAMS, new
 from .dashboard import summarize
 
 
-def create_app(role, config, call, outbox=None, faults=None):
+def create_app(role, config, call, outbox=None, faults=None, identity=None):
     app = Flask(__name__)
     app.config.update(SECRET_KEY=config['session_secret'], MAX_CONTENT_LENGTH=8192,
                       SESSION_COOKIE_NAME='safesignal_' + role,
@@ -19,12 +19,26 @@ def create_app(role, config, call, outbox=None, faults=None):
                       SESSION_COOKIE_PATH='/' + role if config.get('hosted') else '/')
     login_attempts = []
     evidence_dir = Path(config.get('evidence_dir', 'artifacts'))
+    raw_call = call
+    if identity:
+        def call(kind,payload=None):
+            return raw_call(kind,payload,dict(sid=session.get('sid','')))
+
+    def owned_rows():
+        return [r for r in outbox.rows() if not identity or r['owner_user_id']==g.user['id']]
+
+    def enqueue(payload):
+        if identity:
+            identity.accept(g.user['id'],payload)
+            identity.reconcile(outbox)
+        else:
+            outbox.enqueue(payload)
 
     @app.context_processor
     def deployment_context():
-        return {'hosted': config.get('hosted', False), 'combined':config.get('combined',False),
+        return {'identity_enabled':bool(identity),'current_user':getattr(g,'user',None),'hosted': config.get('hosted', False), 'combined':config.get('combined',False),
                 'ephemeral_storage':config.get('ephemeral_storage',False), 'role':role,'categories':CATEGORIES,
-                'severities':SEVERITIES,'incident_states':INCIDENT_STATES,'teams':RESPONSE_TEAMS,
+                'severities':SEVERITIES,'incident_states':INCIDENT_STATES,'teams':((g.user['team'],) if identity and getattr(g,'user',None) and g.user['role']=='responder' else RESPONSE_TEAMS),
                 'today':datetime.now(timezone.utc).strftime('%d %b %Y'), 'local_role_url':
                 ('http://127.0.0.1:5002/' if role=='sender' else 'http://127.0.0.1:5001/')}
 
@@ -44,6 +58,14 @@ def create_app(role, config, call, outbox=None, faults=None):
         if request.method == 'POST':
             if not hmac.compare_digest(session['csrf'], request.form.get('csrf', '')):
                 abort(400)
+        if identity:
+            g.user=identity.user(session.get('sid',''))
+            public=('login','static','register','verify','recovery','reset_password')
+            if request.endpoint not in public and (not g.user or g.user['role'] != ('student' if role=='sender' else 'responder')):
+                return redirect(url_for('login'))
+            if request.endpoint in ('evidence','evidence_file') and g.user and g.user['role']!='responder':
+                abort(403)
+            return
         if request.endpoint != 'login' and request.endpoint != 'static' and session.get('role') != role:
             return redirect(url_for('login'))
 
@@ -61,6 +83,19 @@ def create_app(role, config, call, outbox=None, faults=None):
     @app.route('/login', methods=['GET', 'POST'])
     def login():
         error = None
+        if identity:
+            if request.method=='POST':
+                email=request.form.get('email','')[:254]
+                if not identity.limit('login',email.lower().strip(),request.remote_addr or ''):
+                    abort(429)
+                sid=identity.login(email,request.form.get('password','')[:129],'student' if role=='sender' else 'responder')
+                if sid:
+                    identity.logout(session.get('sid',''))
+                    session.clear()
+                    session.update(sid=sid,role=role,csrf=secrets.token_urlsafe(24))
+                    return redirect(url_for('home'))
+                error='Sign-in failed. Check your credentials, verification and dashboard role.'
+            return render_template('identity.html',mode='login',error=error)
         if request.method == 'POST':
             login_attempts[:] = [t for t in login_attempts if time.monotonic() - t < 60]
             if len(login_attempts) >= 10:
@@ -76,6 +111,8 @@ def create_app(role, config, call, outbox=None, faults=None):
 
     @app.post('/logout')
     def logout():
+        if identity:
+            identity.logout(session.get('sid',''))
         session.clear()
         return redirect(url_for('login'))
 
@@ -87,7 +124,7 @@ def create_app(role, config, call, outbox=None, faults=None):
         overview = dict(summarize([]),activity=[],duplicates=0)
         try:
             if role == 'sender':
-                rows = outbox.rows()
+                rows = owned_rows()
                 for row in rows:
                     row['timeline'] = outbox.timeline(row['alert_id'])
                 overview = dict(summarize([dict(r['alert'],incident_state=r['incident_state']) for r in rows]),
@@ -132,7 +169,7 @@ def create_app(role, config, call, outbox=None, faults=None):
         events = []
         events_source = 'local'
         if role=='sender':
-            row = next((r for r in outbox.rows() if r['alert_id']==aid),None)
+            row = next((r for r in owned_rows() if r['alert_id']==aid),None)
             if row is None:
                 abort(404)
             reply = dict(row['alert'],**{k:row[k] for k in ('incident_state','assigned_team','assigned_to','last_note','resolved_at','server_received_at','responder_acknowledged_at')},code=row['status'])
@@ -160,7 +197,7 @@ def create_app(role, config, call, outbox=None, faults=None):
             ('SAFETY','MEDIUM','TEST ONLY: safety escort requested for a campus training exercise','Synthetic Library Walkway'),
             ('INFRASTRUCTURE','LOW','TEST ONLY: broken walkway lighting reported in a facility drill','Synthetic North Gate'),
         ):
-            outbox.enqueue(new_alert(severity,description,location,category))
+            enqueue(new_alert(severity,description,location,category))
         return redirect(url_for('home'))
 
     @app.post('/incident/<aid>/update')
@@ -209,7 +246,7 @@ def create_app(role, config, call, outbox=None, faults=None):
         if role != 'sender':
             abort(403)
         try:
-            outbox.enqueue(new_alert(request.form.get('severity'), request.form.get('description', ''), request.form.get('location', ''),request.form.get('category','SAFETY')))
+            enqueue(new_alert(request.form.get('severity'), request.form.get('description', ''), request.form.get('location', ''),request.form.get('category','SAFETY')))
         except ValueError:
             abort(400, 'Use a valid severity, description of 10–300 characters and location up to 120 characters.')
         return redirect(url_for('home'))
@@ -218,6 +255,8 @@ def create_app(role, config, call, outbox=None, faults=None):
     def retry(aid):
         if role != 'sender':
             abort(403)
+        if identity and not any(r['alert_id']==aid for r in owned_rows()):
+            abort(404)
         outbox.retry_now(aid)
         return redirect(url_for('home'))
 
@@ -233,4 +272,75 @@ def create_app(role, config, call, outbox=None, faults=None):
             abort(503, 'Backend unavailable; acknowledgment was not confirmed.')
         return redirect(url_for('home'))
 
+    if identity:
+        @app.route('/register',methods=['GET','POST'])
+        def register():
+            error=None
+            message=None
+            if request.method=='POST':
+                if not identity.limit('register',request.form.get('email','').lower().strip()[:254],request.remote_addr or ''):
+                    abort(429)
+                try:
+                    identity.register(request.form.get('email',''),request.form.get('password',''))
+                    message='If eligible, a verification challenge has been sent. Check your inbox.'
+                except ValueError as exc:
+                    error=str(exc)
+            return render_template('identity.html',mode='register',error=error,message=message,mail_available=identity.mail is not None)
+
+        @app.route('/verify',methods=['GET','POST'])
+        def verify():
+            error=message=None
+            if request.method=='POST':
+                if not identity.limit('verify',request.remote_addr or '',request.remote_addr or ''):
+                    abort(429)
+                try:
+                    if request.form.get('resend'):
+                        identity.challenge(request.form.get('email',''),'VERIFY')
+                        message='If eligible, a fresh challenge has been sent.'
+                    else:
+                        identity.consume(request.form.get('challenge',''),'VERIFY')
+                        message='Email verified. You can now sign in.'
+                except ValueError as exc:
+                    error=str(exc)
+            return render_template('identity.html',mode='verify',error=error,message=message)
+
+        @app.route('/recovery',methods=['GET','POST'])
+        def recovery():
+            message=None
+            if request.method=='POST':
+                if not identity.limit('reset',request.form.get('email','').lower().strip()[:254],request.remote_addr or ''):
+                    abort(429)
+                try:
+                    identity.challenge(request.form.get('email',''),'RESET')
+                except ValueError:
+                    pass
+                message='If an eligible verified account exists and mail is configured, a reset challenge has been sent.'
+            return render_template('identity.html',mode='recovery',message=message)
+
+        @app.route('/reset-password',methods=['GET','POST'])
+        def reset_password():
+            error=message=None
+            if request.method=='POST':
+                if not identity.limit('consume-reset',request.remote_addr or '',request.remote_addr or ''):
+                    abort(429)
+                try:
+                    identity.consume(request.form.get('challenge',''),'RESET',request.form.get('password',''))
+                    message='Password reset. Sign in again.'
+                except ValueError as exc:
+                    error=str(exc)
+            return render_template('identity.html',mode='reset',error=error,message=message)
+
+        @app.route('/profile',methods=['GET','POST'])
+        def profile():
+            error=None
+            if request.method=='POST':
+                if not identity.limit('change-password',g.user['id'],request.remote_addr or ''):
+                    abort(429)
+                try:
+                    identity.change_password(session['sid'],request.form.get('current',''),request.form.get('password',''))
+                    session.clear()
+                    return redirect(url_for('login'))
+                except ValueError as exc:
+                    error=str(exc)
+            return render_template('identity.html',mode='profile',error=error)
     return app

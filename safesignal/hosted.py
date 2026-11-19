@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import sqlite3
 import tempfile
 import threading
 
@@ -17,6 +18,7 @@ from .server import AlertServer, request
 from .server_store import Store
 from .tls import create_certificate, client_context, server_context
 from .web import create_app
+from .identity import Identity, configured_mail
 
 
 @contextmanager
@@ -24,6 +26,14 @@ def hosted_runtime(config, data_dir, enable_faults=False):
     """One process, one disk, one outbox worker; never use horizontal replicas."""
     data = Path(data_dir)
     data.mkdir(parents=True, exist_ok=True)
+    if config.get('identity'):
+        for name in ('server.sqlite','outbox.sqlite'):
+            source=data/name
+            backup=data/'pre-v2-backup'/name
+            if source.exists() and not backup.exists():
+                backup.parent.mkdir(exist_ok=True)
+                with sqlite3.connect(source.resolve().as_uri()+'?mode=ro',uri=True) as old, sqlite3.connect(backup) as saved:
+                    old.backup(saved)
     evidence = Path(config.get('evidence_dir',data / 'artifacts'))
     reviewed = Path(__file__).resolve().parents[1] / 'docs/results'
     if not (evidence / 'latest.json').exists() and (reviewed / 'summary.json').exists():
@@ -36,6 +46,7 @@ def hosted_runtime(config, data_dir, enable_faults=False):
         evidence.joinpath('latest.json').write_text(json.dumps(report))
     settings = dict(config, hosted=config.get('hosted',True), combined=True, evidence_dir=str(evidence))
     faults = Faults(data / 'faults.json', enable_faults)
+    identity = Identity(data/'server.sqlite',config['session_secret'],mail=config.get('mail',configured_mail())) if config.get('identity') else None
     if enable_faults:
         faults.set('normal')
     with tempfile.TemporaryDirectory() as certs:
@@ -43,17 +54,20 @@ def hosted_runtime(config, data_dir, enable_faults=False):
         create_certificate(certs,valid_days=3650)
         context = client_context(certs)
         with AlertServer(('127.0.0.1', 0), server_context(certs), Store(data / 'server.sqlite'),
-                         settings['sender_token'], settings['responder_token'], faults) as server:
+                         settings['sender_token'], settings['responder_token'], faults,identity) as server:
             server_thread = threading.Thread(target=server.serve_forever, daemon=True)
             server_thread.start()
             def caller(role):
-                def call(kind, payload=None):
+                def call(kind, payload=None, principal=None):
                     if role == 'sender' and faults.preset() == 'disconnect':
                         raise ConnectionError('Simulated sender disconnect')
-                    return request(server.server_address, context, settings[role + '_token'], kind, payload)
+                    return request(server.server_address, context, settings[role + '_token'], kind, payload,identity,principal)
                 return call
             box = Outbox(data / 'outbox.sqlite')
-            worker = Worker(box, caller('sender'))
+            sender_call=caller('sender')
+            def worker_call(kind,payload):
+                return sender_call(kind,payload,dict(intent=payload['alert_id']) if identity else None)
+            worker = Worker(box, worker_call,identity)
             worker_thread = threading.Thread(target=worker.run, daemon=True)
             worker_thread.start()
             root = Flask(__name__)
@@ -75,8 +89,8 @@ def hosted_runtime(config, data_dir, enable_faults=False):
                 return response, 200 if ready else 503
 
             app = DispatcherMiddleware(root, {
-                '/sender': create_app('sender', settings, caller('sender'), box, faults),
-                '/responder': create_app('responder', settings, caller('responder')),
+                '/sender': create_app('sender', settings, caller('sender'), box, faults,identity),
+                '/responder': create_app('responder', settings, caller('responder'),identity=identity),
             })
             try:
                 yield app
@@ -99,6 +113,7 @@ def main():
     if not hosts:
         raise ValueError('Configure explicit SAFESIGNAL_ALLOWED_HOSTS')
     config['allowed_hosts'] = tuple(hosts)
+    config['identity'] = True
     config['ephemeral_storage'] = os.environ.get('SAFESIGNAL_EPHEMERAL_STORAGE')=='1'
     data_dir = os.environ['SAFESIGNAL_DATA_DIR']
     with hosted_runtime(config, data_dir, os.environ.get('ENABLE_DEMO_FAULTS') == '1') as app:

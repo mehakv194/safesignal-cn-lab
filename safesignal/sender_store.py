@@ -24,6 +24,7 @@ class Outbox:
             for name,definition in {
                 'incident_state':"TEXT NOT NULL DEFAULT 'REPORTED'",'assigned_to':"TEXT NOT NULL DEFAULT ''",
                 'assigned_team':"TEXT NOT NULL DEFAULT ''",'last_note':"TEXT NOT NULL DEFAULT ''",'resolved_at':'TEXT',
+                'owner_user_id':'TEXT',
             }.items():
                 if name not in columns:
                     db.execute(f'ALTER TABLE outbox ADD COLUMN {name} {definition}')
@@ -45,6 +46,17 @@ class Outbox:
     def recover(self):
         with self.connect() as db:
             db.execute("UPDATE outbox SET status='QUEUED', next_attempt_at=0 WHERE status='SENDING'")
+
+    def enqueue_owned(self,payload,owner):
+        validate_alert(payload)
+        with self.connect() as db:
+            old=db.execute('SELECT * FROM outbox WHERE alert_id=?',(payload['alert_id'],)).fetchone()
+            if old:
+                if old['owner_user_id']!=owner or json.loads(old['payload'])!=payload:
+                    raise ValueError('Conflicting queue intent')
+                return
+            db.execute("INSERT INTO outbox(alert_id,payload,owner_user_id) VALUES(?,?,?)",(payload['alert_id'],json.dumps(payload),owner))
+            db.execute('INSERT INTO journey(alert_id,event,recorded_at) VALUES(?,?,?)',(payload['alert_id'],'QUEUED',now()))
 
     def rows(self):
         with self.connect() as db:

@@ -25,6 +25,7 @@ class Store:
                 'incident_state': "TEXT NOT NULL DEFAULT 'REPORTED'",
                 'assigned_to': "TEXT NOT NULL DEFAULT ''", 'assigned_team': "TEXT NOT NULL DEFAULT ''",
                 'last_note': "TEXT NOT NULL DEFAULT ''", 'resolved_at': 'TEXT', 'updated_at': 'TEXT',
+                'owner_user_id': 'TEXT',
             }.items():
                 if name not in columns:
                     db.execute(f'ALTER TABLE alerts ADD COLUMN {name} {definition}')
@@ -37,7 +38,7 @@ class Store:
         db.row_factory = sqlite3.Row
         return db
 
-    def submit(self, payload):
+    def submit(self, payload, owner=None):
         validate_alert(payload)
         canonical = json.dumps(payload, sort_keys=True, separators=(',', ':'))
         digest = hashlib.sha256(canonical.encode()).hexdigest()
@@ -45,11 +46,12 @@ class Store:
         with self.connect() as db:
             db.execute('BEGIN IMMEDIATE')
             old = db.execute('SELECT * FROM alerts WHERE alert_id=?', (aid,)).fetchone()
-            result = 'NEW' if old is None else ('DUPLICATE' if old['payload_hash'] == digest else 'ID_CONFLICT')
+            result = 'NEW' if old is None else ('DUPLICATE' if old['payload_hash'] == digest and old['owner_user_id']==owner else 'ID_CONFLICT')
             stamp = now()
             if old is None:
                 db.execute('INSERT INTO alerts(alert_id,payload,payload_hash,sender_id,status,server_received_at) VALUES (?,?,?,?,?,?)',
                            (aid, canonical, digest, 'synthetic-sender', 'SERVER_RECEIVED', stamp))
+                db.execute('UPDATE alerts SET owner_user_id=? WHERE alert_id=?',(owner,aid))
                 db.execute('INSERT INTO audit(alert_id,event,recorded_at) VALUES (?,?,?)',
                            (aid, 'SERVER_RECEIVED', stamp))
             db.execute('INSERT INTO submission_attempts(alert_id,result,recorded_at) VALUES (?,?,?)',
@@ -70,25 +72,38 @@ class Store:
                     responder_acknowledged_at=row['responder_acknowledged_at'],
                     **{k: row[k] for k in ('incident_state','assigned_to','assigned_team','last_note','resolved_at','updated_at')})
 
-    def listing(self, offset=0, severity='', status='', newest=False, incident_state='', category='', search=''):
+    def scope(self, principal):
+        if principal is None:
+            return '1', ()
+        if principal['role']=='student':
+            return 'owner_user_id=?', (principal['id'],)
+        return "((owner_user_id IS NOT NULL OR ?=1) AND (assigned_team='' OR assigned_team=?))", (principal.get('legacy',0),principal['team'])
+
+    def authorized(self, principal, aid):
+        scope,args=self.scope(principal)
+        with self.connect() as db:
+            return db.execute(f'SELECT 1 FROM alerts WHERE alert_id=? AND {scope}',(aid,*args)).fetchone() is not None
+
+    def listing(self, offset=0, severity='', status='', newest=False, incident_state='', category='', search='', principal=None):
         if severity not in ('', *SEVERITIES) or status not in ('', 'SERVER_RECEIVED', 'RESPONDER_ACKNOWLEDGED'):
             raise ValueError('Invalid filter')
         if incident_state not in ('', *INCIDENT_STATES) or category not in ('', *CATEGORIES) or not isinstance(search,str) or len(search)>100:
             raise ValueError('Invalid incident filter')
         order = 'server_received_at DESC' if newest else "CASE json_extract(payload,'$.severity') WHEN 'CRITICAL' THEN 0 WHEN 'HIGH' THEN 1 WHEN 'MEDIUM' THEN 2 ELSE 3 END, server_received_at"
+        scope,args=self.scope(principal)
         with self.connect() as db:
             ids = db.execute(f'''SELECT alert_id FROM alerts WHERE
                 (?='' OR json_extract(payload,'$.severity')=?) AND (?='' OR status=?)
                 AND (?='' OR incident_state=?)
                 AND (?='' OR coalesce(json_extract(payload,'$.category'),'SAFETY')=?)
                 AND instr(lower(json_extract(payload,'$.description') || ' ' || coalesce(json_extract(payload,'$.location'),'')),lower(?))>0
-                ORDER BY {order} LIMIT 4 OFFSET ?''', (severity, severity, status, status, incident_state, incident_state, category, category, search, offset)).fetchall()
+                AND {scope} ORDER BY {order} LIMIT 4 OFFSET ?''', (severity, severity, status, status, incident_state, incident_state, category, category, search,*args,offset)).fetchall()
         return [self.status(row[0]) for row in ids]
 
-    def acknowledge(self, aid):
-        return self.update_incident(aid, 'CLAIM', 'Campus Safety')
+    def acknowledge(self, aid, principal=None):
+        return self.update_incident(aid, 'CLAIM', 'Campus Safety',principal=principal)
 
-    def update_incident(self, aid, action, team='', note=''):
+    def update_incident(self, aid, action, team='', note='', principal=None):
         if action not in ('CLAIM','START','RESOLVE','NOTE') or not isinstance(note,str) or len(note)>200:
             raise ValueError('Invalid incident action')
         note = note.strip()
@@ -101,7 +116,8 @@ class Store:
             raise ValueError('A note of 5–200 characters is required')
         with self.connect() as db:
             db.execute('BEGIN IMMEDIATE')
-            row = db.execute('SELECT * FROM alerts WHERE alert_id=?',(aid,)).fetchone()
+            scope,args=self.scope(principal)
+            row = db.execute(f'SELECT * FROM alerts WHERE alert_id=? AND {scope}',(aid,*args)).fetchone()
             if row is None:
                 return dict(status='ERROR',code='NOT_FOUND')
             state = row['incident_state']
@@ -126,11 +142,12 @@ class Store:
             rows = db.execute('SELECT event,recorded_at,detail FROM audit WHERE alert_id=? ORDER BY id DESC LIMIT 8', (aid,)).fetchall()
             return [dict(r) for r in reversed(rows)]
 
-    def dashboard(self):
+    def dashboard(self, principal=None):
         from .dashboard import summarize
+        scope,args=self.scope(principal)
         with self.connect() as db:
             rows = [dict(json.loads(r['payload']), **{k:r[k] for k in ('incident_state','assigned_team','responder_acknowledged_at','server_received_at')})
-                    for r in db.execute('SELECT * FROM alerts')]
-            activity = [dict(r) for r in db.execute('SELECT alert_id,event,recorded_at,detail FROM audit ORDER BY id DESC LIMIT 6')]
-            duplicates = db.execute("SELECT count(*) FROM submission_attempts WHERE result='DUPLICATE'").fetchone()[0]
+                    for r in db.execute(f'SELECT * FROM alerts WHERE {scope}',args)]
+            activity = [dict(r) for r in db.execute(f'SELECT alert_id,event,recorded_at,detail FROM audit WHERE alert_id IN (SELECT alert_id FROM alerts WHERE {scope}) ORDER BY id DESC LIMIT 6',args)]
+            duplicates = db.execute(f"SELECT count(*) FROM submission_attempts WHERE result='DUPLICATE' AND alert_id IN (SELECT alert_id FROM alerts WHERE {scope})",args).fetchone()[0]
         return dict(summarize(rows), activity=activity, duplicates=duplicates)

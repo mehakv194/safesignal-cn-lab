@@ -8,16 +8,21 @@ def backoff(attempt):
 
 class Worker:
     """One worker per outbox; independent of browser lifetime."""
-    def __init__(self, outbox, call):
+    def __init__(self, outbox, call, identity=None):
         self.outbox, self.call = outbox, call
         self.stop = threading.Event()
+        self.identity = identity
         self.outbox.recover()
 
     def tick(self):
+        if self.identity:
+            self.identity.reconcile(self.outbox)
         for row in self.outbox.rows():
             if self.stop.is_set():
                 return
             aid, state = row['alert_id'], row['status']
+            if self.identity and not row['owner_user_id']:
+                continue  # Legacy shared records remain restricted; never assign a student.
             if row['incident_state'] == 'RESOLVED':
                 continue
             if state == 'QUEUED' and not self.outbox.claim(aid):

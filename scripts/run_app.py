@@ -21,7 +21,7 @@ if __name__=='__main__':
                 raise SystemExit('Stop the existing demo/app before starting another worker for this outbox.')
     root=Path(__file__).resolve().parents[1]
     config=json.loads((root/'local/config.json').read_text())
-    config.update(hosted=False,allowed_hosts=('127.0.0.1','localhost'),evidence_dir=str(root/'artifacts'))
+    config.update(hosted=False,identity=True,allowed_hosts=('127.0.0.1','localhost'),evidence_dir=str(root/'artifacts'))
     with hosted_runtime(config,root/'local',args.enable_demo_faults) as app:
         print('SafeSignal: http://127.0.0.1:5000 — one app, sender and responder dashboards.',flush=True)
         serve(app,host='127.0.0.1',port=5000,threads=8)
