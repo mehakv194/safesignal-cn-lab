@@ -1,6 +1,6 @@
 # Phase 1–2 review guide
 
-Phase 1–2 source was published and deployed at f7aec68 after owner approval. Phases 3–5 source is on codex/v2-walk-room-trust until final checks and deployment. No paid services were added. Later phase reports record actual deployed revisions.
+Phase 1–2 source was published and deployed at f7aec68 after owner approval. Phases 3–5 passed checks, merged to main and deployed at 9b130a7. See PRODUCTION_RELEASE_2026-11-19.md for actual verification. No paid services were added. Registration remains explicitly disabled on the public service by owner choice.
 
 ## Normal local run
 

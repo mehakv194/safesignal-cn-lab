@@ -40,3 +40,5 @@ Pending: final publication and public smoke verification; real inbox delivery de
 Schema version 4 adds audit/failure data non-destructively. Stop writers before coordinated restore. Keep private matched server/outbox backups and restore to an isolated directory with integrity/regression checks before switching. Never turn public shared-token login back on as fallback. Local fixtures clean up their own temporary files; production reports are never deleted to make tests pass. Free host backup/files remain ephemeral and monitoring is not guaranteed.
 
 Decision: PASS for local Gate 5. User explicitly authorized production publication after successful checks. Trust Lab controls must stay absent publicly; login/security defenses remain active.
+
+Cross-platform follow-up: CI run [44578793459](https://github.com/mehakv194/safesignal-cn-lab/actions/runs/44578793459) at source 9b130a7 passed all **67 tests** on Linux (41.76s) and Windows (75.38s). The same source was fast-forwarded to main for the authorized final deployment. No code changes were made between this checked revision and the release candidate.

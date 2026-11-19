@@ -1,5 +1,12 @@
 # Single Python app — free-only deployment
 
+Current release: SafeSignal v2 through Phases 1–5 is deployed at source 9b130a7 on
+19 November 2026. See [release evidence](implementation/PRODUCTION_RELEASE_2026-11-19.md).
+Human access uses verified individual enrollment-email/password accounts; shared
+role tokens are internal service credentials only. Registration is explicitly
+disabled by owner choice. Trust Lab controls and application faults are local-only.
+The older deployment/token notes below are historical v1 records, not current login instructions.
+
 The user explicitly requires FREE plans only and declined Supabase or any separate
 cloud database. No Supabase project/database was created. No billing upgrade,
 paid instance, persistent disk, external database or trial subscription is allowed.

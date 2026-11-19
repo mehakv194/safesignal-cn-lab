@@ -105,3 +105,9 @@ Phase 4: PASS. Full suite 55 passed in 43.27s using v2-phase4-verified basetemp.
 Phase 5: PASS for local gate. First Windows fixture-cleanup failures were fixed at shared SQLite connection handling, not ignored. Full integrated suite 66 passed in 51.36s; the subsequently added explicit signup-off test passed in 0.83s. All five local browser fixtures returned expected genuine results; public mode direct-lab/fault override denial is tested. Details: PHASE_5.md. Combined 67-case cross-platform CI and final public smoke verification remain release checks.
 
 Owner answered the email-delivery question: **Keep registration disabled for now**. This is now explicit fail-closed configuration, not just missing SMTP. No new verification bypass or public demo account is authorized. Paid services remain prohibited. Phases 6–8 are not started or marked complete.
+
+## Final authorized release — complete
+
+Phases 3, 4 and 5: PASS. Final source 9b130a7 passed 67 tests on Linux (41.76s) and 67 on Windows (75.38s), CI run 44578793459. Fast-forwarded to main and deployed to existing Render Free service. Deployment dep-dbvj82nf3r2c73cdnehg reported Live on 19 November 2026. Public health/root/login/signup checks returned 200; public Trust Lab URLs returned 404. Signup button remains disabled by explicit owner decision.
+
+Actual deployment/test/rollback/limits record: [PRODUCTION_RELEASE_2026-11-19.md](PRODUCTION_RELEASE_2026-11-19.md). No production authenticated user journey or actual inbox delivery claimed. Local synthetic end-to-end journeys and hosted-mode regression tests passed. Phase 6 approval: PENDING; no further phase work started.
