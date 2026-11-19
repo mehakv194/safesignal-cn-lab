@@ -3,6 +3,11 @@ from datetime import datetime, timezone
 
 from .walks import uuid
 
+AUTOMATED_REPLY = (
+    'Your update was saved in this Incident Room. A demo responder can reply here. '
+    'This automatic reply confirms storage only.'
+)
+
 
 def text(value, limit):
     if not isinstance(value,str) or not 1 <= len(value.strip()) <= limit or any(ord(c)<32 and c not in '\n\t\r' for c in value):
@@ -62,12 +67,19 @@ class Rooms:
                     return dict(status='ERROR',code='ID_CONFLICT')
                 return dict(status='OK',code='SERVER_RECEIVED',message_id=old['id'],received=old['received'],duplicate=True)
             count=db.execute('SELECT count(*) FROM incident_messages WHERE author_id=? AND received>?',(user['id'],stamp-60)).fetchone()[0]
-            total=db.execute('SELECT count(*) FROM incident_messages WHERE incident_id=?',(aid,)).fetchone()[0]
+            total=db.execute("SELECT count(*) FROM incident_messages WHERE incident_id=? AND author_role!='system'",(aid,)).fetchone()[0]
             if count>=30 or total>=500:
                 return dict(status='ERROR',code='RATE_LIMITED')
             cursor=db.execute('INSERT INTO incident_messages(incident_id,author_id,author_role,client_uuid,body,received) VALUES(?,?,?,?,?,?)',
                               (aid,user['id'],user['role'],key,body,stamp))
             mid=cursor.lastrowid
+            if user['role'] == 'student':
+                db.execute(
+                    '''INSERT INTO incident_messages
+                       (incident_id,author_id,author_role,client_uuid,body,received)
+                       VALUES(?,?,?,?,?,?)''',
+                    (aid, 'safesignal-system', 'system', str(mid), AUTOMATED_REPLY, stamp),
+                )
             db.execute('INSERT INTO audit(alert_id,event,recorded_at,detail) VALUES(?,?,?,?)',
                        (aid,'MESSAGE_STORED',datetime.fromtimestamp(stamp,timezone.utc).isoformat(),'Private message stored; no read receipt inferred'))
         return dict(status='OK',code='SERVER_RECEIVED',message_id=mid,received=stamp,duplicate=False)

@@ -124,6 +124,9 @@ def main():
     invite_file = Path(__file__).resolve().with_name('hosted_invite.json')
     if invite_file.is_file():
         config['student_invite'] = json.loads(invite_file.read_text(encoding='utf-8'))
+    responder_invite = invite_file.with_name('hosted_responder_invite.json')
+    if responder_invite.is_file():
+        config['responder_invite'] = json.loads(responder_invite.read_text(encoding='utf-8'))
     config['ephemeral_storage'] = os.environ.get('SAFESIGNAL_EPHEMERAL_STORAGE')=='1'
     data_dir = os.environ['SAFESIGNAL_DATA_DIR']
     with hosted_runtime(config, data_dir, os.environ.get('ENABLE_DEMO_FAULTS') == '1') as app:

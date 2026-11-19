@@ -411,23 +411,24 @@ def create_app(role, config, call, outbox=None, faults=None, identity=None):
 
         @app.route('/activate-demo', methods=['GET', 'POST'])
         def redeem_invite():
-            invite = config.get('student_invite')
-            if role != 'sender' or not config.get('hosted') or not invite:
+            invited_role = 'student' if role == 'sender' else 'responder'
+            invite = config.get(f'{invited_role}_invite')
+            if not config.get('hosted') or not invite:
                 abort(404)
             error = None
             if request.method == 'POST':
                 email = request.form.get('email', '').strip().lower()
-                if not identity.limit('student-invite', email, request.remote_addr or ''):
+                if not identity.limit(f'{invited_role}-invite', email, request.remote_addr or ''):
                     abort(429)
                 try:
                     password = request.form.get('password', '')
                     if password != request.form.get('confirm_password'):
                         raise ValueError('Passwords must match.')
-                    identity.redeem_invite(email, request.form.get('code', ''), password, invite)
+                    identity.redeem_invite(email, request.form.get('code', ''), password, invite, role=invited_role)
                     return redirect(url_for('login'))
                 except ValueError as exc:
                     error = str(exc)
-            return render_template('student_invite.html', error=error)
+            return render_template('student_invite.html', error=error, invited_role=invited_role)
 
         @app.route('/register',methods=['GET','POST'])
         def register():

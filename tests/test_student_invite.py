@@ -35,3 +35,26 @@ def test_hosted_invite_requires_inbox_code_and_cannot_reset_account(tmp_path):
     assert auth.login(email, password, 'student')
     assert not auth.login(email, password, 'responder')
     assert 'Registration unavailable' in client.get('/sender/register', **https).text
+
+
+def test_hosted_responder_invite_uses_server_role_and_team(tmp_path):
+    auth = Identity(tmp_path / 'server.sqlite', 'fixture-secret', clock=lambda: 1000)
+    email = '0000000002@mail.jiit.ac.in'
+    code = 'b' * 43
+    password = 'fresh-synthetic-password'
+    invite = dict(expires_at=1001, team='Medical Team',
+                  commitment=digest(f'safesignal-invite-v1:{email}:{code}'))
+    config = dict(session_secret='fixture-secret', hosted=True, responder_invite=invite)
+    desk = create_app('responder', config, None, identity=auth)
+    client = Client(DispatcherMiddleware(Response(status=404), {'/responder': desk}))
+    path = '/responder/activate-demo'
+    https = {'base_url': 'https://localhost'}
+    page = client.get(path, **https)
+    assert 'Activate your responder demo' in page.text
+    csrf = re.search(r'name="csrf" value="([^"]+)"', page.text)[1]
+    fields = dict(email=email, code=code, password=password, confirm_password=password, csrf=csrf,
+                  role='student', team='Campus Safety')
+    assert client.post(path, data=fields, **https).location == '/responder/login'
+    assert not auth.login(email, password, 'student')
+    sid = auth.login(email, password, 'responder')
+    assert auth.user(sid)['team'] == 'Medical Team'

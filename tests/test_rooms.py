@@ -36,7 +36,9 @@ def test_private_thread_and_duplicate_conflict(room_lab):
     assert rooms.send(b,aid,str(uuid4()),'Guessed case')['code']=='NOT_FOUND'
     store.update_incident(aid,'CLAIM','Medical Team',principal=desk)
     assert rooms.send(desk,aid,str(uuid4()),'Are you in a safe place?')['status']=='OK'
-    assert len(rooms.get(a,aid)['messages'])==2
+    thread = rooms.get(a, aid)['messages']
+    assert [message['author_role'] for message in thread] == ['student', 'system', 'responder']
+    assert 'confirms storage only' in thread[1]['body']
     unauthorized=dict(desk,team='Facilities Team')
     assert rooms.get(unauthorized,aid)['code']=='NOT_FOUND'
     assert rooms.feedback(a,aid,str(uuid4()),'CONFIRM','Too early')['code']=='INVALID_TRANSITION'
@@ -66,7 +68,8 @@ def test_bounded_unicode_pagination_quota_and_audit_redaction(room_lab):
     for i in range(6): rooms.send(a,aid,str(uuid4()),str(i)+'🚦'*299)
     page=rooms.get(a,aid)
     assert len(page['messages'])==4 and page['older']
-    assert len(rooms.get(a,aid,page['older'])['messages'])==2
+    older_page = rooms.get(a, aid, page['older'])
+    assert [message['author_role'] for message in older_page['messages']] == ['student', 'system'] * 2
     encoded=json.dumps(page,ensure_ascii=False).encode()
     assert len(encoded)<protocol.MAX_FRAME
     assert '🚦' not in str(store.audit(aid))
@@ -117,6 +120,7 @@ def test_room_web_csrf_escaping_and_private_polling(room_lab,tmp_path):
     assert reply.json['code']=='SERVER_RECEIVED'
     page=c.get('/incident/'+aid).text
     assert '&lt;script&gt;TEST ONLY&lt;/script&gt;' in page
+    assert 'SafeSignal · Automated' in page and 'confirms storage only' in page
     assert 'data-room-send' in page and 'room-thread' in page
     with c.session_transaction() as s:s.update(sid=sb,role='sender',csrf='csrf')
     assert c.get('/incident/'+aid).status_code==404
