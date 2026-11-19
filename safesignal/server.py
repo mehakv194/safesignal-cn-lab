@@ -32,12 +32,13 @@ class AlertServer(socketserver.ThreadingTCPServer):
     allow_reuse_address = True
     daemon_threads = True
 
-    def __init__(self, address, context, store, sender_token, responder_token, faults=None, identity=None):
+    def __init__(self, address, context, store, sender_token, responder_token, faults=None, identity=None, walks=None):
         if not sender_token or not responder_token or sender_token == responder_token:
             raise ValueError('Distinct nonempty role tokens required')
         self.context, self.store = context, store
         self.faults = faults
         self.identity = identity
+        self.walks = walks
         self.tokens = {'sender': sender_token, 'responder': responder_token}
         self.rate_lock = threading.Lock()
         self.rates = {}
@@ -57,7 +58,8 @@ class AlertServer(socketserver.ThreadingTCPServer):
             required = {'SUBMIT_ALERT': 'sender', 'GET_STATUS': ('sender','responder'),
                         'LIST_ALERTS': 'responder', 'ACK_ALERT': 'responder',
                         'UPDATE_INCIDENT':'responder','DASHBOARD':'responder',
-                        'GET_AUDIT': ('sender','responder'), 'HEALTH': 'sender'}
+                        'GET_AUDIT': ('sender','responder'), 'HEALTH': 'sender',
+                        'WALK_START':'sender','WALK_GET':'sender','WALK_LIST':'sender','WALK_ACTION':'sender'}
             permitted = required.get(kind, ())
             if role is None or (role not in permitted if isinstance(permitted,tuple) else permitted != role):
                 return dict(status='ERROR', code='UNAUTHORIZED', request_id=rid)
@@ -90,6 +92,17 @@ class AlertServer(socketserver.ThreadingTCPServer):
                 UUID(payload['alert_id'])
             if kind == 'HEALTH':
                 result = dict(status='OK', code='HEALTHY')
+            elif kind.startswith('WALK_'):
+                if not self.walks or not principal or principal.get('job'):
+                    raise ValueError('Walks unavailable')
+                if kind=='WALK_START':
+                    result=self.walks.start(principal,payload)
+                elif kind=='WALK_GET':
+                    result=self.walks.get(principal,payload['walk_id'])
+                elif kind=='WALK_LIST':
+                    result=self.walks.listing(principal)
+                else:
+                    result=self.walks.action(principal,payload['walk_id'],payload['action'],payload['action_id'])
             elif kind == 'SUBMIT_ALERT':
                 result = self.store.submit(payload, principal['id'] if principal else None)
             elif kind == 'GET_STATUS':

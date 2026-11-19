@@ -1,6 +1,7 @@
 import hmac
 import secrets
 import time
+from uuid import uuid4
 
 from flask import Flask, abort, redirect, render_template, request, session, url_for, send_from_directory, g
 from pathlib import Path
@@ -47,6 +48,10 @@ def create_app(role, config, call, outbox=None, faults=None, identity=None):
         if not value:
             return '—'
         return datetime.fromisoformat(value).strftime('%d %b · %H:%M UTC')
+
+    @app.template_filter('epoch')
+    def epoch(value):
+        return datetime.fromtimestamp(value,timezone.utc).strftime('%d %b · %H:%M UTC') if value is not None else '—'
 
     @app.before_request
     def guard():
@@ -159,7 +164,13 @@ def create_app(role, config, call, outbox=None, faults=None, identity=None):
         if error and role=='responder':
             abort(503)
         template='student_home.html' if identity and role=='sender' and request.args.get('view','overview')=='overview' else 'home.html'
-        return render_template(template, role=role, rows=rows, error=error, severities=SEVERITIES,
+        active_walk=None
+        if identity and role=='sender':
+            try:
+                active_walk=next((w for w in call('WALK_LIST').get('walks',[]) if w['status'] in ('ACTIVE','NEEDS_FOLLOW_UP')),None)
+            except (OSError,EOFError,ValueError):
+                pass
+        return render_template(template, role=role, rows=rows, error=error, severities=SEVERITIES,active_walk=active_walk,
                                faults=faults, preset=faults.preset() if faults else 'normal',
                                offset=request.args.get('offset', '0'), reachable=reachable,overview=overview,
                                view=request.args.get('view','overview'))
@@ -274,11 +285,56 @@ def create_app(role, config, call, outbox=None, faults=None, identity=None):
         return redirect(url_for('home'))
 
     if identity:
-        @app.get('/walks')
-        def my_walks():
+        def walk_call(kind,payload=None):
             if role!='sender':
                 abort(403)
-            return render_template('walks_pending.html')
+            try:
+                reply=call(kind,payload)
+            except (OSError,EOFError,ValueError):
+                abort(503,'Walk action not confirmed. Reconnect and retry the same action; no offline delivery is claimed.')
+            if reply.get('status')!='OK':
+                abort(404 if reply.get('code')=='NOT_FOUND' else 400,'Walk request rejected. Check its state, interval and duration.')
+            return reply
+
+        @app.get('/walks')
+        def my_walks():
+            return render_template('walk_list.html',walks=walk_call('WALK_LIST')['walks'])
+
+        @app.route('/walks/start',methods=['GET','POST'])
+        def start_walk():
+            if role!='sender':
+                abort(403)
+            session.setdefault('start_walk_key',str(uuid4()))
+            if request.method=='POST':
+                try:
+                    payload=dict(action_id=request.form.get('action_id'),origin=request.form.get('origin'),destination=request.form.get('destination'),
+                                 duration=int(request.form.get('duration','0')),interval=int(request.form.get('interval','0')))
+                except ValueError:
+                    abort(400)
+                result=walk_call('WALK_START',payload)
+                session['start_walk_key']=str(uuid4())
+                return redirect(url_for('walk_detail',wid=result['id']))
+            return render_template('walk_start.html',action_id=session['start_walk_key'])
+
+        @app.get('/walks/<wid>')
+        def walk_detail(wid):
+            result=walk_call('WALK_GET',dict(walk_id=wid))
+            if session.get('walk_keys_for')!=wid:
+                session['walk_keys_for']=wid
+                session['walk_keys']={a:str(uuid4()) for a in ('SAFE','HELP','ARRIVE','END')}
+            return render_template('walk_detail.html',walk=result,keys=session['walk_keys'])
+
+        @app.post('/walks/<wid>/action')
+        def walk_action(wid):
+            action=request.form.get('action')
+            result=walk_call('WALK_ACTION',dict(walk_id=wid,action=action,action_id=request.form.get('action_id')))
+            if 'walk_keys' in session:
+                keys=dict(session['walk_keys']);keys[action]=str(uuid4());session['walk_keys']=keys
+            if action=='HELP':
+                identity.reconcile(outbox)
+                link=next(l for l in result['links'] if l['kind']=='HELP')
+                return redirect(url_for('incident',aid=link['alert_id']))
+            return redirect(url_for('walk_detail',wid=wid))
 
         @app.route('/register',methods=['GET','POST'])
         def register():

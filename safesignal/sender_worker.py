@@ -8,13 +8,16 @@ def backoff(attempt):
 
 class Worker:
     """One worker per outbox; independent of browser lifetime."""
-    def __init__(self, outbox, call, identity=None):
+    def __init__(self, outbox, call, identity=None, maintenance=None):
         self.outbox, self.call = outbox, call
         self.stop = threading.Event()
         self.identity = identity
+        self.maintenance = maintenance
         self.outbox.recover()
 
     def tick(self):
+        if self.maintenance:
+            self.maintenance()
         if self.identity:
             self.identity.reconcile(self.outbox)
         for row in self.outbox.rows():

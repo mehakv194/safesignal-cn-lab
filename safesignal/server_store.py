@@ -19,6 +19,9 @@ class Store:
                     id INTEGER PRIMARY KEY, alert_id TEXT, event TEXT, recorded_at TEXT);
                 CREATE TABLE IF NOT EXISTS submission_attempts (
                     id INTEGER PRIMARY KEY, alert_id TEXT, result TEXT, recorded_at TEXT);
+                CREATE TABLE IF NOT EXISTS walk_links(
+                    walk_id TEXT NOT NULL,kind TEXT NOT NULL,alert_id TEXT UNIQUE NOT NULL,
+                    disposition TEXT NOT NULL,PRIMARY KEY(walk_id,kind));
             ''')
             columns = {r[1] for r in db.execute('PRAGMA table_info(alerts)')}
             for name, definition in {
@@ -26,6 +29,7 @@ class Store:
                 'assigned_to': "TEXT NOT NULL DEFAULT ''", 'assigned_team': "TEXT NOT NULL DEFAULT ''",
                 'last_note': "TEXT NOT NULL DEFAULT ''", 'resolved_at': 'TEXT', 'updated_at': 'TEXT',
                 'owner_user_id': 'TEXT',
+                'followup_disposition': "TEXT NOT NULL DEFAULT ''",
             }.items():
                 if name not in columns:
                     db.execute(f'ALTER TABLE alerts ADD COLUMN {name} {definition}')
@@ -53,6 +57,7 @@ class Store:
                 db.execute('INSERT INTO alerts(alert_id,payload,payload_hash,sender_id,status,server_received_at) VALUES (?,?,?,?,?,?)',
                            (aid, canonical, digest, 'synthetic-sender', 'SERVER_RECEIVED', stamp))
                 db.execute('UPDATE alerts SET owner_user_id=? WHERE alert_id=?',(owner,aid))
+                db.execute("UPDATE alerts SET followup_disposition=coalesce((SELECT disposition FROM walk_links WHERE alert_id=?),'') WHERE alert_id=?",(aid,aid))
                 db.execute('INSERT INTO audit(alert_id,event,recorded_at) VALUES (?,?,?)',
                            (aid, 'SERVER_RECEIVED', stamp))
             db.execute('INSERT INTO submission_attempts(alert_id,result,recorded_at) VALUES (?,?,?)',
@@ -71,7 +76,7 @@ class Store:
         return dict(status='OK', code=row['status'], **json.loads(row['payload']),
                     server_received_at=row['server_received_at'],
                     responder_acknowledged_at=row['responder_acknowledged_at'],
-                    **{k: row[k] for k in ('incident_state','assigned_to','assigned_team','last_note','resolved_at','updated_at')})
+                    **{k: row[k] for k in ('incident_state','assigned_to','assigned_team','last_note','resolved_at','updated_at','followup_disposition')})
 
     def scope(self, principal):
         if principal is None:
@@ -98,7 +103,7 @@ class Store:
                 AND (?='' OR incident_state=?)
                 AND (?='' OR coalesce(json_extract(payload,'$.category'),'SAFETY')=?)
                 AND instr(lower(json_extract(payload,'$.description') || ' ' || coalesce(json_extract(payload,'$.location'),'')),lower(?))>0
-                AND {scope} ORDER BY {order} LIMIT 4 OFFSET ?''', (severity, severity, status, status, incident_state, incident_state, category, category, search,*args,offset)).fetchall()
+                AND {scope} AND followup_disposition!='WITHDRAWN' ORDER BY {order} LIMIT 4 OFFSET ?''', (severity, severity, status, status, incident_state, incident_state, category, category, search,*args,offset)).fetchall()
         return [self.status(row[0]) for row in ids]
 
     def acknowledge(self, aid, principal=None):
@@ -146,6 +151,7 @@ class Store:
     def dashboard(self, principal=None):
         from .dashboard import summarize
         scope,args=self.scope(principal)
+        scope += " AND followup_disposition!='WITHDRAWN'"
         with self.connect() as db:
             rows = [dict(json.loads(r['payload']), **{k:r[k] for k in ('incident_state','assigned_team','responder_acknowledged_at','server_received_at')})
                     for r in db.execute(f'SELECT * FROM alerts WHERE {scope}',args)]

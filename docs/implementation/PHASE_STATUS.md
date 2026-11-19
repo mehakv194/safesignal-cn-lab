@@ -89,3 +89,13 @@ Remaining: real mail delivery and production/staging approval, real-device/scree
 Decision: PASS for local Gates 1 and 2, with stated release/device limits. Not a production readiness verdict.
 User approval to begin Phase 3: **PENDING**.
 Deployment approval for Phase 1/2: **NOT GIVEN**.
+
+---
+
+## New approval and Phase 3 gate
+
+User subsequently explicitly requested production deployment of Phase 1–2, implementation of Phases 3/4/5, and production deployment of those after completion. This supersedes the pending approvals above for those phases only. Phases 6–8 are not implicitly approved.
+
+Phase 1–2 deployed on Render Free: source f7aec68, deployment dep-dbvipf3l550s73fvbjlg; Live observed and public account page verified. Signup remains disabled without real email delivery; no verification bypass.
+
+Phase 3: PASS. Full suite 50 passed in 36.65s using v2-phase3-verified basetemp. Real walk start/safe/help browser proof captured; queue/TLS, ownership, idempotency, timer/restart and late response tests pass. See PHASE_3.md for files, rollback and limits. Phase 4 execution: APPROVED by the same user request.

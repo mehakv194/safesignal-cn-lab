@@ -19,6 +19,7 @@ from .server_store import Store
 from .tls import create_certificate, client_context, server_context
 from .web import create_app
 from .identity import Identity, configured_mail
+from .walks import Walks
 
 
 @contextmanager
@@ -53,8 +54,10 @@ def hosted_runtime(config, data_dir, enable_faults=False):
         # Private per-process certificate: verified on loopback, never the public HTTPS certificate.
         create_certificate(certs,valid_days=3650)
         context = client_context(certs)
-        with AlertServer(('127.0.0.1', 0), server_context(certs), Store(data / 'server.sqlite'),
-                         settings['sender_token'], settings['responder_token'], faults,identity) as server:
+        store=Store(data/'server.sqlite')
+        walks=Walks(identity,store) if identity else None
+        with AlertServer(('127.0.0.1', 0), server_context(certs), store,
+                         settings['sender_token'], settings['responder_token'], faults,identity,walks) as server:
             server_thread = threading.Thread(target=server.serve_forever, daemon=True)
             server_thread.start()
             def caller(role):
@@ -67,7 +70,7 @@ def hosted_runtime(config, data_dir, enable_faults=False):
             sender_call=caller('sender')
             def worker_call(kind,payload):
                 return sender_call(kind,payload,dict(intent=payload['alert_id']) if identity else None)
-            worker = Worker(box, worker_call,identity)
+            worker = Worker(box, worker_call,identity,walks.reconcile if walks else None)
             worker_thread = threading.Thread(target=worker.run, daemon=True)
             worker_thread.start()
             root = Flask(__name__)

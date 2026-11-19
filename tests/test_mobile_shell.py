@@ -21,7 +21,7 @@ def test_mobile_navigation_and_real_private_home(tmp_path):
     assert 'Backend unavailable' in page.text
     assert "frame-ancestors 'none'" in page.headers['Content-Security-Policy']
     assert page.headers['Cache-Control']=='no-store'
-    assert 'not available' in client.get('/walks').text
+    assert client.get('/walks').status_code==503
     assert email in client.get('/profile').text
     assert 'Sign out' in client.get('/profile').text
     assert client.post('/profile',data={}).status_code==400
