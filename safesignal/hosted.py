@@ -66,8 +66,10 @@ def hosted_runtime(config, data_dir, enable_faults=False):
         store=Store(data/'server.sqlite')
         walks=Walks(identity,store) if identity else None
         rooms=Rooms(identity,store) if identity else None
+        box = Outbox(data / 'outbox.sqlite')
+        delivery_fault = box.demo_fault if settings['hosted'] and demo_accounts is not None else None
         with AlertServer(('127.0.0.1', 0), server_context(certs), store,
-                         settings['sender_token'], settings['responder_token'], faults,identity,walks,rooms) as server:
+                         settings['sender_token'], settings['responder_token'], faults,identity,walks,rooms,delivery_fault=delivery_fault) as server:
             server_thread = threading.Thread(target=server.serve_forever, daemon=True)
             server_thread.start()
             def caller(role):
@@ -76,9 +78,10 @@ def hosted_runtime(config, data_dir, enable_faults=False):
                         raise ConnectionError('Simulated sender disconnect')
                     return request(server.server_address, context, settings[role + '_token'], kind, payload,identity,principal)
                 return call
-            box = Outbox(data / 'outbox.sqlite')
             sender_call=caller('sender')
             def worker_call(kind,payload):
+                if kind == 'SUBMIT_ALERT' and delivery_fault and delivery_fault(payload['alert_id']) == 'disconnect':
+                    raise ConnectionError('Simulated sender disconnect')
                 return sender_call(kind,payload,dict(intent=payload['alert_id']) if identity else None)
             worker = Worker(box, worker_call,identity,walks.reconcile if walks else None)
             worker_thread = threading.Thread(target=worker.run, daemon=True)

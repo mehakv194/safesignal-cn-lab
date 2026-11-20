@@ -1,11 +1,15 @@
 import re
 import time
+from functools import partial
+
+import pytest
 
 from argon2 import PasswordHasher
 from werkzeug.test import Client
 from werkzeug.wrappers import Response
 
 from safesignal.hosted import hosted_runtime
+from safesignal.sender_store import Outbox
 
 
 def csrf(response):
@@ -83,38 +87,41 @@ def test_free_plan_configuration_and_retention_notice(tmp_path):
     assert 'reports can reset when the host restarts' in client.get('/').get_data(as_text=True)
 
 
-def test_local_transfer_lab_shows_retry_then_same_responder_receipt(tmp_path):
+@pytest.mark.parametrize("hosted", [False, True], ids=["local", "hosted"])
+def test_transfer_lab_shows_retry_then_same_responder_receipt(tmp_path, hosted):
     password = 'synthetic-password-123'
     hashed = PasswordHasher().hash(password)
-    config = dict(identity=True, hosted=False, session_secret='fixture-key', sender_token='fixture-sender',
+    config = dict(identity=True, hosted=hosted, allowed_hosts=('campus.example',) if hosted else ('localhost',), session_secret='fixture-key', sender_token='fixture-sender',
                   responder_token='fixture-responder', mail=None,
                   demo_accounts={'student': hashed, 'responder': hashed})
     with hosted_runtime(config, tmp_path, enable_faults=True) as app:
         client = Client(app, Response)
+        base = 'https://campus.example' if hosted else 'http://localhost'
+        get, post = partial(client.get, base_url=base), partial(client.post, base_url=base)
         for index, prefix in enumerate(('sender', 'responder'), start=1):
             path = f'/{prefix}/login'
-            form = dict(email=f'{index:010}@mail.jiit.ac.in', password=password, csrf=csrf(client.get(path)))
-            assert client.post(path, data=form).location == f'/{prefix}/'
+            form = dict(email=f'{index:010}@mail.jiit.ac.in', password=password, csrf=csrf(get(path)))
+            assert post(path, data=form).location == f'/{prefix}/'
 
         sender_lab = '/sender/?view=network'
         responder_lab = '/responder/?view=network'
-        assert 'Live Network Lab' in client.get(sender_lab).text
-        desk_csrf = csrf(client.get('/responder/profile'))
-        assert client.post('/responder/network-demo/report', data={'csrf': desk_csrf}).status_code == 404
-        assert client.post('/responder/simulation', data={'csrf': desk_csrf, 'preset': 'disconnect'}).status_code == 403
-        token = csrf(client.get(sender_lab))
+        assert 'Live Network Lab' in get(sender_lab).text
+        desk_csrf = csrf(get('/responder/profile'))
+        assert post('/responder/network-demo/report', data={'csrf': desk_csrf}).status_code == 404
+        assert post('/responder/simulation', data={'csrf': desk_csrf, 'preset': 'disconnect'}).status_code == 403
+        token = csrf(get(sender_lab))
 
         def set_link(preset):
-            assert client.post('/sender/simulation', data={'csrf': token, 'preset': preset}).location == sender_lab
+            assert post('/sender/simulation', data={'csrf': token, 'preset': preset}).location == sender_lab
 
         def submit():
-            assert client.post('/sender/network-demo/report', data={'csrf': token}).location == sender_lab
-            return re.search(r'<code>([a-f0-9-]{36})</code>', client.get(sender_lab).text)[1]
+            assert post('/sender/network-demo/report', data={'csrf': token}).location == sender_lab
+            return re.search(r'<code>([a-f0-9-]{36})</code>', get(sender_lab).text)[1]
 
         def wait_for(path, content):
             deadline = time.monotonic() + 8
             while time.monotonic() < deadline:
-                page = client.get(path).text
+                page = get(path).text
                 if content in page:
                     return page
                 time.sleep(.1)
@@ -124,16 +131,31 @@ def test_local_transfer_lab_shows_retry_then_same_responder_receipt(tmp_path):
         incident = submit()
         page = wait_for(sender_lab, 'No successful receipt · retry scheduled')
         assert incident in page and 'Awaiting server receipt' in page
-        assert incident not in client.get(responder_lab).text
+        assert incident not in get(responder_lab).text
+        if hosted:
+            assert post('/sender/network-demo/report', data={'csrf': token}).status_code == 409
+            ordinary = 'TEST ONLY: regular report during simulated disconnect'
+            assert post('/sender/submit', data=dict(csrf=token, severity='MEDIUM', description=ordinary)).status_code == 302
+            box = Outbox(tmp_path / 'password-demo' / 'outbox.sqlite')
+            ordinary_id = next(row['alert_id'] for row in box.rows() if row['alert']['description'] == ordinary)
+            assert incident not in wait_for(responder_lab, ordinary_id)
         set_link('normal')
         assert incident in wait_for(sender_lab, 'Server receipt confirmed')
-        assert client.get(responder_lab).text.count(f'<code>{incident}</code>') == 1
+        assert get(responder_lab).text.count(f'<code>{incident}</code>') == 1
         update = dict(csrf=desk_csrf, action='CLAIM', team='Medical Team')
-        assert client.post(f'/responder/incident/{incident}/update?view=network', data=update).location == responder_lab
+        assert post(f'/responder/incident/{incident}/update?view=network', data=update).location == responder_lab
         wait_for(sender_lab, 'Responder acknowledged the incident')
 
         set_link('ack_lost')
         receipt_lost = submit()
         page = wait_for(sender_lab, 'Repeated incident ID · original receipt reused')
         assert receipt_lost in page and 'No successful receipt · retry scheduled' in page
-        assert client.get(responder_lab).text.count(f'<code>{receipt_lost}</code>') == 1
+        assert get(responder_lab).text.count(f'<code>{receipt_lost}</code>') == 1
+
+        if hosted:
+            set_link('delay')
+            started = time.monotonic()
+            delayed = submit()
+            assert delayed in wait_for(sender_lab, 'Server receipt confirmed')
+            assert time.monotonic() - started >= 1.5
+            assert delayed in get(responder_lab).text

@@ -19,6 +19,8 @@ class Outbox:
                     responder_acknowledged_at TEXT);
                 CREATE TABLE IF NOT EXISTS journey (
                     id INTEGER PRIMARY KEY, alert_id TEXT, event TEXT, recorded_at TEXT);
+                CREATE TABLE IF NOT EXISTS demo_faults (
+                    alert_id TEXT PRIMARY KEY, preset TEXT NOT NULL, expires_at REAL);
             ''')
             columns = {r[1] for r in db.execute('PRAGMA table_info(outbox)')}
             for name,definition in {
@@ -62,6 +64,25 @@ class Outbox:
         with self.connect() as db:
             where,args=(' WHERE owner_user_id=?',(owner,)) if owner is not None else ('',())
             return [dict(r, alert=json.loads(r['payload'])) for r in db.execute('SELECT * FROM outbox'+where+' ORDER BY rowid DESC',args)]
+
+    def set_demo_fault(self, aid, preset):
+        # Bound the disconnect so a report can recover even if the browser is closed.
+        expires = time.time() + 45 if preset == 'disconnect' else None
+        with self.connect() as db:
+            db.execute('INSERT INTO demo_faults VALUES (?,?,?)', (aid, preset, expires))
+
+    def demo_fault(self, aid):
+        with self.connect() as db:
+            row = db.execute('SELECT preset FROM demo_faults WHERE alert_id=? AND (expires_at IS NULL OR expires_at>?)',
+                             (aid, time.time())).fetchone()
+            return row['preset'] if row else 'normal'
+
+    def restore_demo_link(self, aid, owner):
+        with self.connect() as db:
+            removed = db.execute("""DELETE FROM demo_faults WHERE alert_id=? AND preset='disconnect'
+                AND EXISTS (SELECT 1 FROM outbox WHERE alert_id=? AND owner_user_id=?)""", (aid, aid, owner))
+            if removed.rowcount:
+                db.execute("UPDATE outbox SET next_attempt_at=0 WHERE alert_id=? AND status='QUEUED'", (aid,))
 
     def claim(self, aid):
         with self.connect() as db:

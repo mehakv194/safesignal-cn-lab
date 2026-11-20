@@ -16,8 +16,9 @@ class Handler(socketserver.BaseRequestHandler):
             with self.server.context.wrap_socket(self.request, server_side=True) as sock:
                 req = protocol.receive(sock)
                 response = self.server.dispatch(req)
-                if req.get('type') == 'SUBMIT_ALERT' and response.get('status') == 'OK' and self.server.faults:
-                    preset = self.server.faults.preset()
+                if req.get('type') == 'SUBMIT_ALERT' and response.get('status') == 'OK' and (self.server.delivery_fault or self.server.faults):
+                    preset = (self.server.delivery_fault(req['payload']['alert_id']) if self.server.delivery_fault
+                              else self.server.faults.preset())
                     if preset == 'ack_lost' and not response.get('duplicate'):
                         return  # Receipt suppressed only after the store transaction committed.
                     if preset == 'delay':
@@ -32,11 +33,12 @@ class AlertServer(socketserver.ThreadingTCPServer):
     allow_reuse_address = True
     daemon_threads = True
 
-    def __init__(self, address, context, store, sender_token, responder_token, faults=None, identity=None, walks=None, rooms=None):
+    def __init__(self, address, context, store, sender_token, responder_token, faults=None, identity=None, walks=None, rooms=None, delivery_fault=None):
         if not sender_token or not responder_token or sender_token == responder_token:
             raise ValueError('Distinct nonempty role tokens required')
         self.context, self.store = context, store
         self.faults = faults
+        self.delivery_fault = delivery_fault
         self.identity = identity
         self.walks = walks
         self.rooms = rooms

@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 
 from .models import SEVERITIES, CATEGORIES, INCIDENT_STATES, RESPONSE_TEAMS, new_alert
 from .dashboard import summarize
+from .faults import PRESETS
 
 
 def create_app(role, config, call, outbox=None, faults=None, identity=None):
@@ -27,7 +28,8 @@ def create_app(role, config, call, outbox=None, faults=None, identity=None):
     if config.get('hosted'):
         faults=None
     transfer_view = bool(config.get('combined') and (config.get('hosted') or (faults and faults.enabled)))
-    fault_controls = bool(transfer_view and faults and faults.enabled)
+    hosted_demo = bool(transfer_view and config.get('hosted') and demo_login and identity and role == 'sender')
+    fault_controls = hosted_demo or bool(transfer_view and faults and faults.enabled and role == 'sender')
     if identity:
         def call(kind,payload=None):
             return raw_call(kind,payload,dict(sid=session.get('sid','')))
@@ -153,7 +155,9 @@ def create_app(role, config, call, outbox=None, faults=None, identity=None):
         if transfer_view and request.args.get('view') == 'network':
             rows, events, error = [], [], None
             if role == 'sender':
-                rows = owned_rows()[:1]
+                owned = owned_rows()
+                demo_id = session.get('network_demo_id') if hosted_demo else None
+                rows = [row for row in owned if row['alert_id'] == demo_id][:1] or owned[:1]
                 if rows:
                     events = outbox.timeline(rows[0]['alert_id'])[-12:]
             else:
@@ -166,7 +170,9 @@ def create_app(role, config, call, outbox=None, faults=None, identity=None):
                     error = 'The incident server is unavailable. Its latest receipts could not be checked.'
             return render_template('network_lab.html', rows=rows, events=events, error=error,
                                    fault_controls=fault_controls,
-                                   preset=faults.preset() if fault_controls else None, view='network')
+                                   hosted_demo=hosted_demo,
+                                   preset=(session.get('network_demo_preset', 'normal') if hosted_demo
+                                           else faults.preset() if fault_controls else None), view='network')
         error = None
         reachable = False
         rows = []
@@ -283,6 +289,14 @@ def create_app(role, config, call, outbox=None, faults=None, identity=None):
 
     @app.post('/simulation')
     def simulation():
+        if hosted_demo:
+            preset = request.form.get('preset')
+            if preset not in PRESETS:
+                abort(400)
+            if preset == 'normal':
+                outbox.restore_demo_link(session.get('network_demo_id'), g.user['id'])
+            session['network_demo_preset'] = preset
+            return redirect(url_for('home', view='network'))
         if role != 'sender' or not faults or not faults.enabled:
             abort(403)
         try:
@@ -297,7 +311,15 @@ def create_app(role, config, call, outbox=None, faults=None, identity=None):
     def network_sample():
         if not fault_controls or role != 'sender':
             abort(404)
-        enqueue(new_alert('MEDIUM', 'TEST ONLY: Network Lab transfer', 'Synthetic classroom'))
+        payload = new_alert('MEDIUM', 'TEST ONLY: Network Lab transfer', 'Synthetic classroom')
+        if hosted_demo:
+            if outbox.demo_fault(session.get('network_demo_id')) == 'disconnect':
+                abort(409, 'Restore the current test link before sending another test report.')
+            preset = session.get('network_demo_preset', 'normal')
+            if preset != 'normal':
+                outbox.set_demo_fault(payload['alert_id'], preset)
+            session['network_demo_id'] = payload['alert_id']
+        enqueue(payload)
         return redirect(url_for('home', view='network'))
 
     @app.get('/evidence')

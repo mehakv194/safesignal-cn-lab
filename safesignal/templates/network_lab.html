@@ -12,7 +12,8 @@
 {% if role=='sender' and fault_controls %}
 <section class="panel transfer-controls">
   <h2>Connection controls</h2>
-  <p>Disconnect the sender link, then send a test report. Restore the link to watch the queue retry.</p>
+  <p>Disconnect the sender link, then send a test report. Select Normal connection to watch the queue retry.</p>
+  {% if hosted_demo %}<p>Controls apply only to reports sent with this test button. Keep this page online. A simulated disconnect ends automatically after 45 seconds.</p>{% endif %}
   <form class="transfer-buttons" method="post" action="{{ url_for('simulation') }}">
     <input type="hidden" name="csrf" value="{{ session.csrf }}">
     {% for name, label in presets.items() %}
@@ -32,7 +33,7 @@
 <div id="live-transfer" data-poll-region>
 <section class="panel transfer-panel">
   <div class="panel-heading">
-    <div><h2>{{ 'Latest outgoing report' if role=='sender' else 'Latest server receipts' }}</h2>{% if fault_controls %}<p>Sender link simulation · {{ presets[preset] }}</p>{% endif %}</div>
+    <div><h2>{{ 'Tracked outgoing report' if hosted_demo else 'Latest outgoing report' if role=='sender' else 'Latest server receipts' }}</h2>{% if fault_controls %}<p>{{ 'Selected test mode' if hosted_demo else 'Sender link simulation' }} · {{ presets[preset] }}</p>{% endif %}</div>
   </div>
   {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
   {% if role=='sender' and rows %}
@@ -77,5 +78,5 @@
   {% endif %}
 </section>
 </div>
-<p class="info-note">This trace shows recorded application events. Each transfer uses length-prefixed JSON over TLS/TCP. {% if fault_controls %}During the simulated disconnect, the report waits on disk until an attempt can reach the server. Browser internet stays connected for this demo.{% else %}Fault injection is disabled here. Use the local classroom lab to demonstrate a disconnected sender or a lost receipt.{% endif %}</p>
+<p class="info-note">This trace shows recorded application events. Each transfer uses length-prefixed JSON over TLS/TCP. {% if fault_controls %}During the simulated disconnect, the report waits on disk until an attempt can reach the server. Browser internet stays connected for this demo.{% elif role=='responder' %}Test reports from the Student Lab appear here after they reach the incident server.{% else %}Fault injection is disabled here. Use the local classroom lab to demonstrate a disconnected sender or a lost receipt.{% endif %}</p>
 {% endblock %}

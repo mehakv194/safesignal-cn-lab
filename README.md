@@ -56,9 +56,10 @@ Loopback tests require network access; do not disable TLS to bypass restrictions
 
 ## Live network classroom demo
 
-The hosted Network Lab shows delivery attempts and committed receipts for
-simulated reports submitted through the normal Student dashboard. Fault controls
-are available in the classroom preview below.
+The hosted demo accounts can run the same walkthrough on the Student and Responder
+Network Lab pages. On the hosted app, connection controls affect only reports
+created with **Send test report**. A simulated disconnect ends automatically after
+45 seconds. Regular reports keep their normal delivery path.
 
 For a classroom demo with two preconfigured local accounts, run
 `.\.venv\Scripts\python scripts/run_app.py --classroom-demo` from the repository root.
