@@ -1,5 +1,5 @@
 {% from 'icons.html' import icon %}
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SafeSignal · Campus {{ role|capitalize }}</title><link rel="stylesheet" href="{{ url_for('static',filename='styles.css') }}"><script defer src="{{ url_for('static',filename='app.js') }}"></script></head>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SafeSignal · Campus {{ role|capitalize }}</title><link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static',filename='safesignal-192.png') }}"><link rel="stylesheet" href="{{ url_for('static',filename='styles.css') }}"><script defer src="{{ url_for('static',filename='app.js') }}"></script></head>
 <body><a class="skip-link" href="#main">Skip to content</a><div class="app-shell">
 <aside class="sidebar"><a class="brand" href="{{ url_for('home') }}"><span class="brand-mark">{{ icon('pulse') }}</span>SafeSignal<span class="brand-dot">●</span></a><div class="workspace"><span class="workspace-icon">C</span><div><strong>Campus workspace</strong><small>Educational simulation</small></div></div>
 <div class="nav-label">WORKSPACE</div><nav aria-label="Main navigation">
