@@ -10,6 +10,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from argon2 import PasswordHasher
+from argon2.exceptions import VerifyMismatchError
 from safesignal.identity import Identity, email_address
 
 parser=argparse.ArgumentParser(description=__doc__)
@@ -20,13 +21,31 @@ if len(set(emails))!=2 or set(emails) & {'0000000001@mail.jiit.ac.in','000000000
     parser.error('Use two distinct approved JIIT addresses; old shared demo accounts are not eligible.')
 hasher=PasswordHasher()
 records={}
-for email in emails:
-    first=getpass(f'New unique password for {email}: ')
-    Identity.password(first)
-    if first!=getpass('Confirm password: '):
-        raise SystemExit('Passwords did not match. No release secrets were written.')
-    records[email]=hasher.hash(first)
 path=Path('local/release-secrets.env')
+if path.exists():
+    raise SystemExit(f'Private settings already exist in {path}. Use that file in Render.')
+print('Choose a different password for each account, 12 to 128 characters long. Typing is hidden.')
+for email in emails:
+    while True:
+        first=getpass(f'New password for {email} (12–128 characters): ')
+        try:
+            Identity.password(first)
+        except ValueError as error:
+            print(error)
+            continue
+        if first!=getpass('Confirm password: '):
+            print('Passwords did not match. Try again for this account.')
+            continue
+        if records:
+            try:
+                hasher.verify(next(iter(records.values())), first)
+            except VerifyMismatchError:
+                pass
+            else:
+                print('Choose a different password for the second account.')
+                continue
+        break
+    records[email]=hasher.hash(first)
 path.parent.mkdir(exist_ok=True)
 fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
 with os.fdopen(fd,'w',encoding='utf-8') as file:
