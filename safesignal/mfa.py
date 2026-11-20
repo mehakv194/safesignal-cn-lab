@@ -76,7 +76,10 @@ class MFA:
     def uri(self, row):
         if not row or row['secret'] is None:
             return None
-        return pyotp.TOTP(self.open(row['user_id'],row['secret'])).provisioning_uri(row['email'],issuer_name='SecureSignal')
+        email=self.identity.release_emails.get(row['user_id'],row['email'])
+        with self.identity.connect() as db:
+            team=db.execute('SELECT team FROM users WHERE id=?',(row['user_id'],)).fetchone()[0]
+        return pyotp.TOTP(self.open(row['user_id'],row['secret'])).provisioning_uri(f'{email} ({team})',issuer_name='SecureSignal')
 
     def consume(self, db, uid, code, factor):
         if re.fullmatch('[0-9]{6}',code):

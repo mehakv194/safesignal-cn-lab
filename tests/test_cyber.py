@@ -264,3 +264,31 @@ def test_cyber_migration_preserves_legacy_case_and_queued_payload(tmp_path):
     assert cases.list(user,0)==[]
     assert cases.read(user,legacy['alert_id'])==(None,[])
     assert identity.user(sid)['id']==user['id']
+
+def test_ephemeral_hosted_release_reseeds_private_accounts_with_mfa(tmp_path):
+    import json
+    from argon2 import PasswordHasher
+    passwords = {f'{n:010}@mail.jiit.ac.in':f'Unique synthetic password {n}' for n in (11,12)}
+    accounts = {email:PasswordHasher().hash(password) for email,password in passwords.items()}
+    hosted='https://fixture.example'
+    config=dict(identity=True, hosted=True, cyber=True, ephemeral_storage=True, mail=None,
+                session_secret='release-fixture-secret', sender_token='fixture-sender', responder_token='fixture-responder',
+                allowed_hosts=('fixture.example',), release_demo_accounts=json.dumps(accounts),
+                mfa_key=base64.b64encode(b'm'*32).decode(), evidence_keys={'v1':base64.b64encode(b'e'*32).decode()},
+                durable_evidence=True)
+    for name in ('instance','fresh-instance'):
+        with hosted_runtime(config,tmp_path/name) as app:
+            clients={}
+            for email,password in passwords.items():
+                for role,prefix in [('student','sender'),('responder','responder'),('reviewer','responder')]:
+                    client=clients[role]=Client(app,Response)
+                    route=f'/{prefix}/login'
+                    form=dict(csrf=csrf(client.get(route,base_url=hosted)),email=email,password=password,workspace=role)
+                    response=client.post(route,base_url=hosted,data=form)
+                    assert response.location==('/sender/' if role=='student' else '/responder/mfa')
+            with Identity(tmp_path/name/'server.sqlite',config['session_secret']).connect() as db:
+                assert [r[0] for r in db.execute('SELECT team FROM users ORDER BY team')]==['','','Cyber Response','Cyber Response','Security Review','Security Review']
+            assert 'Evidence upload is unavailable' in clients['student'].get('/sender/report',base_url=hosted).text
+            assert clients['student'].get('/sender/trust-lab',base_url=hosted).status_code==404
+            assert client.get('/responder/security-alerts',base_url=hosted).location=='/responder/mfa'
+            assert client.get('/healthz',base_url=hosted).json=={'ready':True}

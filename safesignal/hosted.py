@@ -68,6 +68,11 @@ def hosted_runtime(config, data_dir, enable_faults=False):
         keys={kid:secret_key(key) for kid,key in config.get('evidence_keys',{}).items()}
         if any(not key or key==mfa_key for key in keys.values()):
             raise ValueError('Provide dedicated, nonempty evidence keys.')
+        if config.get('release_demo_accounts'):
+            if not settings['hosted'] or not config.get('ephemeral_storage') or not mfa_key or identity.mail:
+                raise ValueError('The hosted classroom fixture requires ephemeral hosting, an MFA key and disabled registration.')
+            from .release_demo import provision
+            provision(identity,config['release_demo_accounts'])
         identity.mfa=MFA(identity,mfa_key)
         identity.monitor=Monitor(identity,config.get('security_rules'))
         cases=Cases(identity)
@@ -152,6 +157,7 @@ def main():
     config['identity'] = True
     config['mail'] = configured_mail() if os.environ.get('SAFESIGNAL_REGISTRATION_ENABLED')=='1' else None
     config.update(cyber=True,mfa_key=os.environ.get('SECURESIGNAL_MFA_KEY'),
+                  release_demo_accounts=os.environ.get('SECURESIGNAL_RELEASE_DEMO_ACCOUNTS'),
                   evidence_keys=json.loads(os.environ.get('SECURESIGNAL_EVIDENCE_KEYS','{}')),
                   evidence_active=os.environ.get('SECURESIGNAL_EVIDENCE_ACTIVE','v1'),
                   durable_evidence=os.environ.get('SECURESIGNAL_DURABLE_EVIDENCE')=='1')
@@ -165,6 +171,8 @@ def main():
     if demo_file.is_file() and not config.get('cyber'):
         config['demo_accounts'] = json.loads(demo_file.read_text(encoding='utf-8'))
     config['ephemeral_storage'] = os.environ.get('SAFESIGNAL_EPHEMERAL_STORAGE')=='1'
+    if config['ephemeral_storage'] and (not config.get('release_demo_accounts') or not config.get('mfa_key')):
+        raise ValueError('An ephemeral SecureSignal release requires private demo account configuration and an MFA key.')
     data_dir = os.environ['SAFESIGNAL_DATA_DIR']
     with hosted_runtime(config, data_dir, os.environ.get('ENABLE_DEMO_FAULTS') == '1') as app:
         # Only Render ingress reaches this listener. Trust its scheme, never forwarded host.

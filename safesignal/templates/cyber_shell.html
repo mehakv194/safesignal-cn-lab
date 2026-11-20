@@ -13,5 +13,5 @@
 {% elif current_user.team=='Security Review' %}<a href="{{ url_for('cyber_alerts') }}">Security alerts</a>
 {% else %}<a href="{{ url_for('home') }}">Case queue</a><a href="{{ url_for('home',view='assigned') }}">Assigned cases</a>{% endif %}
 <a href="{{ url_for('profile') }}">Account</a><a href="{{ url_for('cyber_sessions') }}">Sessions</a></nav>{% endif %}</header>
-<main id="main" tabindex="-1">{% block content %}{% endblock %}</main>
+<main id="main" tabindex="-1">{% if ephemeral_storage %}<p class="info-note">Classroom demo: use synthetic reports only. Accounts, MFA enrollment and cases may reset when the host restarts. Evidence uploads are disabled.</p>{% endif %}{% block content %}{% endblock %}</main>
 <footer>SecureSignal · Campus cyber incident reporting. Never share credentials, codes, or keys.</footer></div></body></html>

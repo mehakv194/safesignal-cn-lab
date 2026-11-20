@@ -3,11 +3,12 @@
 <h1>{% if demo_login and mode=='login' %}{{ 'Student' if role=='sender' else 'Responder' }} sign in{% else %}{{ {'login':'Welcome back','register':'Create your account','verify':'Verify your inbox','recovery':'Recover your account','reset':'Choose a new password','profile':'Your profile'}[mode] }}{% endif %}</h1>
 {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
 {% if message %}<p class="info-note" role="status">{{ message }}</p>{% endif %}
-{% if mode=='profile' %}<p>{{ current_user.email }}</p><p>{{ 'Demo account' if demo_login else 'Verified' }} · {{ current_user.role|title }}{% if current_user.team %} · {{ current_user.team }}{% endif %}</p>{% if not demo_login %}<h2>Change password</h2>{% endif %}{% endif %}
+{% if mode=='profile' %}<p>{{ current_user.email }}</p><p>{{ 'Demo account' if demo_login else 'Verified' }} · {{ current_user.role|title }}{% if current_user.team %} · {{ current_user.team }}{% endif %}</p>{% if release_demo %}<p>This demo password is managed by the operator.</p>{% elif not demo_login %}<h2>Change password</h2>{% endif %}{% endif %}
 {% if mode=='register' and not mail_available %}<p class="info-note">Registration unavailable: email delivery is not configured. Verification cannot be bypassed.</p>{% endif %}
-{% if not demo_login or mode=='login' %}
+{% if mode=='login' or (not demo_login and not (release_demo and mode=='profile')) %}
 <form method="post"><input type="hidden" name="csrf" value="{{ session.csrf }}">
 {% if mode in ['login','register','recovery'] %}<label>{{ 'Demo email' if demo_login else 'Enrollment email' }}<input name="email" type="email" required maxlength="254" autocomplete="username" placeholder="10 digits @mail.jiit.ac.in"></label>{% endif %}
+{% if release_demo and mode=='login' and role=='responder' %}<label>Workspace<select name="workspace" required><option value="responder">Cyber Response</option><option value="reviewer">Security Review</option></select></label>{% endif %}
 {% if mode=='profile' %}<label>Current password<input name="current" type="password" required autocomplete="current-password" maxlength="128"></label>{% endif %}
 {% if mode in ['verify','reset'] %}<label>One-time challenge<input name="challenge" required maxlength="100" autocomplete="one-time-code"></label>{% endif %}
 {% if mode in ['login','register','reset','profile'] %}<label>{{ 'Password' if mode=='login' else 'New password (12–128 characters)' }}<input name="password" type="password" required maxlength="128" {% if mode!='login' %}minlength="12"{% endif %} autocomplete="{{ 'current-password' if mode=='login' else 'new-password' }}"></label><button type="button" class="button secondary" data-toggle-password aria-pressed="false">Show password</button>{% endif %}
@@ -15,7 +16,7 @@
 <button class="button full" {% if mode=='register' and not mail_available %}disabled{% endif %}>{{ {'login':'Sign in','register':'Send verification','verify':'Verify email','recovery':'Request reset challenge','reset':'Reset password','profile':'Change password & sign out'}[mode] }}</button></form>
 {% endif %}
 {% if mode=='verify' %}<details><summary>Resend verification</summary><form method="post"><input type="hidden" name="csrf" value="{{ session.csrf }}"><label>Enrollment email<input name="email" type="email" required maxlength="254"></label><button class="button secondary" name="resend" value="1">Resend challenge</button></form></details>{% endif %}
-{% if demo_login %}<nav class="identity-links" aria-label="Navigation"><a href="/">Main page</a></nav>
+{% if demo_login or release_demo %}<nav class="identity-links" aria-label="Navigation"><a href="/">Main page</a></nav>
 {% else %}<nav class="identity-links" aria-label="Account actions"><a href="{{ url_for('login') }}">Sign in</a><a href="{{ url_for('register') }}">Create account</a><a href="{{ url_for('verify') }}">Verify inbox</a><a href="{{ url_for('recovery') }}">Forgot password</a><a href="{{ url_for('reset_password') }}">Use reset challenge</a></nav>{% endif %}
 <p>{{ 'Use the assigned demo account.' if demo_login else 'Use your individual account.' }}{% if cyber_mode and role=="responder" %} Authenticator verification is required.{% elif not cyber_mode %} No real dispatch, GPS or safety monitoring.{% endif %}</p></section>
 {% if mode=='profile' %}<form class="profile-logout" action="{{ url_for('logout') }}" method="post"><input type="hidden" name="csrf" value="{{ session.csrf }}"><button class="button secondary full">Sign out</button></form>{% endif %}

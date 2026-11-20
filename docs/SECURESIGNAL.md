@@ -150,3 +150,21 @@ the same policy to snapshots and backups.
   paths at those widths were exercised by HTTP tests, not visually.
 - Production was not touched. This is a local implementation and validation,
   not a public deployment or an independent production security review.
+
+## Free hosted classroom release
+
+Only use this mode after the operator verifies the addresses and approves the
+release as a synthetic-data classroom demo. Render Free loses SQLite on
+restart, including MFA enrollments. Registration stays disabled and evidence
+uploads stay disabled. Local startup keys and accounts are never reused.
+
+Run the following in your own terminal and enter unique passwords at the
+hidden prompts (replace the example addresses with verified emails):
+
+    python scripts/prepare_release_demo.py 0000000011@mail.jiit.ac.in 0000000012@mail.jiit.ac.in
+
+Transfer the two environment settings from local/release-secrets.env to
+Render Environment. Save without deploying until the new build is ready.
+Never commit this file or share it in chat. The configuration recreates the
+approved accounts after a clean start. Each address has separate Student, Cyber Response, and Security Review profiles.\nSelect the workspace at sign-in and enroll an authenticator separately for\neach privileged profile. Repeated startup
+does not change existing account passwords or factor enrollment.

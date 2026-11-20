@@ -67,7 +67,7 @@ def create_app(role, config, call, outbox=None, faults=None, identity=None):
 
     @app.context_processor
     def deployment_context():
-        return {'cyber_mode':bool(cyber),'trust_lab_enabled':local_lab,'demo_login':demo_login,'identity_enabled':bool(identity),'current_user':getattr(g,'user',None),'hosted': config.get('hosted', False), 'combined':config.get('combined',False),
+        return {'cyber_mode':bool(cyber),'release_demo':bool(identity and identity.release_profiles),'trust_lab_enabled':local_lab,'demo_login':demo_login,'identity_enabled':bool(identity),'current_user':getattr(g,'user',None),'hosted': config.get('hosted', False), 'combined':config.get('combined',False),
                 'ephemeral_storage':config.get('ephemeral_storage',False), 'role':role,'categories':CATEGORIES,
                 'severities':SEVERITIES,'incident_states':INCIDENT_STATES,'teams':((g.user['team'],) if identity and getattr(g,'user',None) and g.user['role']=='responder' else RESPONSE_TEAMS),
                 'today':datetime.now(timezone.utc).strftime('%d %b %Y'), 'local_role_url':
@@ -90,6 +90,10 @@ def create_app(role, config, call, outbox=None, faults=None, identity=None):
     @app.before_request
     def guard():
         if cyber and request.endpoint not in cyber_web.ENDPOINTS:
+            abort(404)
+        if cyber and identity.release_profiles and request.endpoint in ('register','verify','recovery','reset_password'):
+            abort(404)
+        if cyber and identity.release_profiles and request.endpoint=='profile' and request.method=='POST':
             abort(404)
         if request.endpoint in ('trust_lab','run_trust_fixture') and (not local_lab or request.remote_addr not in ('127.0.0.1','::1')):
             abort(404)
@@ -143,7 +147,7 @@ def create_app(role, config, call, outbox=None, faults=None, identity=None):
                     abort(429)
                 try:
                     sid=identity.login(email,request.form.get('password','')[:129],'student' if role=='sender' else 'responder',
-                                       request.remote_addr or '', pending=bool(cyber and role=='responder'))
+                                       request.remote_addr or '', pending=bool(cyber and role=='responder'), profile=request.form.get('workspace'))
                 except RuntimeError:
                     abort(503,'Authenticator unavailable. Contact the maintainer.')
                 if sid:

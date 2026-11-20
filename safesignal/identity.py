@@ -34,6 +34,8 @@ def canonical(value):
 class Identity:
     def __init__(self, path, secret, clock=time.time, mail=None):
         self.mfa = None
+        self.release_profiles = None
+        self.release_emails = {}
         self.monitor = None
         self.path, self.clock, self.mail = str(path), clock, mail
         self.key = hmac.digest(secret.encode(), b'safesignal-principal-v2', 'sha256')
@@ -218,13 +220,18 @@ class Identity:
             if self.mfa:
                 db.execute('DELETE FROM mfa_pending WHERE user_id=?', (row['user_id'],))
 
-    def login(self, email, password, role, ip='', *, pending=False):
+    def login(self, email, password, role, ip='', *, pending=False, profile=None):
         try:
             email = email_address(email)
         except ValueError:
             email = ''
         with self.connect() as db:
-            user = db.execute('SELECT * FROM users WHERE email=?', (email,)).fetchone()
+            if self.release_profiles is not None:
+                name = 'student' if role=='student' else profile
+                uid = self.release_profiles.get((email,name))
+                user = db.execute('SELECT * FROM users WHERE id=?',(uid,)).fetchone()
+            else:
+                user = db.execute('SELECT * FROM users WHERE email=?', (email,)).fetchone()
         try:
             valid = self.verify_password(user['password_hash'] if user else self.dummy, password)
         except (VerificationError, InvalidHashError):
@@ -254,7 +261,7 @@ class Identity:
                 return None
             if row:
                 db.execute('UPDATE sessions SET last_seen=? WHERE hash=?', (self.clock(), digest(sid)))
-        return dict(row) if row else None
+        return dict(row, email=self.release_emails.get(row['id'],row['email'])) if row else None
 
     def logout(self, sid):
         with self.connect() as db:
