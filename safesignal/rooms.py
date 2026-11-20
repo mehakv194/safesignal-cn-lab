@@ -35,6 +35,11 @@ class Rooms:
             ''')
 
     def access(self,db,user,aid):
+        if self.identity.mfa:
+            from .cyber_cases import Cases
+            scope,args=Cases.scope(user)
+            return db.execute(f'''SELECT c.*,a.incident_state FROM cyber_cases c JOIN alerts a
+                ON a.alert_id=c.id WHERE c.id=? AND {scope}''',(aid,*args)).fetchone()
         scope,args=self.store.scope(user)
         row=db.execute(f'SELECT * FROM alerts WHERE alert_id=? AND {scope}',(aid,*args)).fetchone()
         if not row:
@@ -73,7 +78,7 @@ class Rooms:
             cursor=db.execute('INSERT INTO incident_messages(incident_id,author_id,author_role,client_uuid,body,received) VALUES(?,?,?,?,?,?)',
                               (aid,user['id'],user['role'],key,body,stamp))
             mid=cursor.lastrowid
-            if user['role'] == 'student':
+            if user['role'] == 'student' and not self.identity.mfa:
                 db.execute(
                     '''INSERT INTO incident_messages
                        (incident_id,author_id,author_role,client_uuid,body,received)

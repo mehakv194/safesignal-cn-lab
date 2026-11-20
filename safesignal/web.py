@@ -20,10 +20,21 @@ def create_app(role, config, call, outbox=None, faults=None, identity=None):
                       SESSION_COOKIE_SECURE=config.get('hosted', False),
                       SESSION_COOKIE_PATH='/' + role if config.get('hosted') else '/')
     login_attempts = []
+    cyber = config.get('cyber_services')
+    if cyber:
+        from . import cyber_web
+        from io import BytesIO
+        from flask import Request
+        class EvidenceRequest(Request):
+            # Keep multipart plaintext in memory; Flask's request cap bounds each request.
+            def _get_file_stream(self, total_content_length, content_type, filename=None, content_length=None):
+                return BytesIO()
+        app.request_class = EvidenceRequest
+        app.config.update(MAX_CONTENT_LENGTH=cyber[1].max_size+65536, MAX_FORM_MEMORY_SIZE=65536, MAX_FORM_PARTS=30)
     demo_login = config.get('demo_accounts') is not None
     evidence_dir = Path(config.get('evidence_dir', 'artifacts'))
     raw_call = call
-    local_lab=bool(identity and config.get('trust_lab') and not config.get('hosted',False)
+    local_lab=bool(not cyber and identity and config.get('trust_lab') and not config.get('hosted',False)
                    and set(config.get('allowed_hosts',('127.0.0.1','localhost'))) <= {'127.0.0.1','localhost'})
     if config.get('hosted'):
         faults=None
@@ -56,7 +67,7 @@ def create_app(role, config, call, outbox=None, faults=None, identity=None):
 
     @app.context_processor
     def deployment_context():
-        return {'trust_lab_enabled':local_lab,'demo_login':demo_login,'identity_enabled':bool(identity),'current_user':getattr(g,'user',None),'hosted': config.get('hosted', False), 'combined':config.get('combined',False),
+        return {'cyber_mode':bool(cyber),'trust_lab_enabled':local_lab,'demo_login':demo_login,'identity_enabled':bool(identity),'current_user':getattr(g,'user',None),'hosted': config.get('hosted', False), 'combined':config.get('combined',False),
                 'ephemeral_storage':config.get('ephemeral_storage',False), 'role':role,'categories':CATEGORIES,
                 'severities':SEVERITIES,'incident_states':INCIDENT_STATES,'teams':((g.user['team'],) if identity and getattr(g,'user',None) and g.user['role']=='responder' else RESPONSE_TEAMS),
                 'today':datetime.now(timezone.utc).strftime('%d %b %Y'), 'local_role_url':
@@ -78,6 +89,8 @@ def create_app(role, config, call, outbox=None, faults=None, identity=None):
 
     @app.before_request
     def guard():
+        if cyber and request.endpoint not in cyber_web.ENDPOINTS:
+            abort(404)
         if request.endpoint in ('trust_lab','run_trust_fixture') and (not local_lab or request.remote_addr not in ('127.0.0.1','::1')):
             abort(404)
         if request.host.split(':')[0] not in config.get('allowed_hosts', ('127.0.0.1', 'localhost')):
@@ -94,6 +107,11 @@ def create_app(role, config, call, outbox=None, faults=None, identity=None):
         if identity:
             g.user=identity.user(session.get('sid',''))
             public=('login','static','register','verify','recovery','reset_password','redeem_invite')
+            if cyber:
+                if session.get('pending_mfa') and not g.user:
+                    if request.endpoint not in ('cyber_mfa','cyber_qr','logout','static'):
+                        return redirect(url_for('cyber_mfa'))
+                public += ('cyber_mfa','cyber_qr')
             if request.endpoint not in public and (not g.user or g.user['role'] != ('student' if role=='sender' else 'responder')):
                 return redirect(url_for('login'))
             if request.endpoint in ('evidence','evidence_file') and g.user and g.user['role']!='responder':
@@ -111,6 +129,8 @@ def create_app(role, config, call, outbox=None, faults=None, identity=None):
 
     @app.errorhandler(503)
     def unavailable(error):
+        if cyber:
+            return render_template('cyber_error.html',error=error),503
         return render_template('unavailable.html',view='overview'),503
 
     @app.route('/login', methods=['GET', 'POST'])
@@ -121,10 +141,17 @@ def create_app(role, config, call, outbox=None, faults=None, identity=None):
                 email=request.form.get('email','')[:254]
                 if not identity.limit('login',email.lower().strip(),request.remote_addr or ''):
                     abort(429)
-                sid=identity.login(email,request.form.get('password','')[:129],'student' if role=='sender' else 'responder',request.remote_addr or '')
+                try:
+                    sid=identity.login(email,request.form.get('password','')[:129],'student' if role=='sender' else 'responder',
+                                       request.remote_addr or '', pending=bool(cyber and role=='responder'))
+                except RuntimeError:
+                    abort(503,'Authenticator unavailable. Contact the maintainer.')
                 if sid:
                     identity.logout(session.get('sid',''))
                     session.clear()
+                    if cyber and role=='responder':
+                        session.update(pending_mfa=sid,csrf=secrets.token_urlsafe(24))
+                        return redirect(url_for('cyber_mfa'))
                     session.update(sid=sid,role=role,csrf=secrets.token_urlsafe(24))
                     return redirect(url_for('home'))
                 error=('Sign-in failed. Check your email, password and dashboard role.' if demo_login
@@ -145,6 +172,8 @@ def create_app(role, config, call, outbox=None, faults=None, identity=None):
 
     @app.post('/logout')
     def logout():
+        if cyber and session.get('pending_mfa'):
+            identity.mfa.cancel(session['pending_mfa'])
         if identity:
             identity.logout(session.get('sid',''))
         session.clear()
@@ -152,6 +181,14 @@ def create_app(role, config, call, outbox=None, faults=None, identity=None):
 
     @app.get('/')
     def home():
+        if cyber:
+            if role=='responder' and g.user['team']=='Security Review':
+                return redirect(url_for('cyber_alerts'))
+            offset=max(0,min(100000,request.args.get('offset',0,type=int)))
+            assigned=role=='responder' and request.args.get('view')=='assigned'
+            rows=cyber[0].list(g.user,offset,assigned)
+            return render_template('cyber_queue.html',rows=rows[:20],more=len(rows)>20,offset=offset,
+                                   assigned=assigned,categories=cyber_web.CATEGORIES)
         if transfer_view and request.args.get('view') == 'network':
             rows, events, error = [], [], None
             if role == 'sender':
@@ -563,4 +600,6 @@ def create_app(role, config, call, outbox=None, faults=None, identity=None):
                 except ValueError as exc:
                     error=str(exc)
             return render_template('identity.html',mode='profile',error=error)
+    if cyber:
+        cyber_web.register(app,role,cyber,identity,outbox,call,operation_key)
     return app

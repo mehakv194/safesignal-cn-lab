@@ -1,0 +1,4 @@
+{% if room_error %}<p role="status">The conversation is temporarily unavailable.</p>{% endif %}
+{% for message in room.messages %}<article class="cyber-row"><div><strong>{{ 'Storage notice' if message.author_role=='system' else message.author_role|title }}</strong> · {{ message.received|epoch }}<p class="cyber-copy">{{ message.body }}</p></div></article>
+{% else %}{% if not room_error %}<p>No messages yet.</p>{% endif %}{% endfor %}
+{% if room.older %}<p><a href="{{ url_for('cyber_case',aid=row.id,before=room.older) }}">Older messages</a>{% if request.args.get('before') %} · <a href="{{ url_for('cyber_case',aid=row.id) }}">Latest messages</a>{% endif %}</p>{% endif %}

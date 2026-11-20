@@ -28,6 +28,8 @@ def hosted_runtime(config, data_dir, enable_faults=False):
     """One process, one disk, one outbox worker; never use horizontal replicas."""
     data = Path(data_dir)
     demo_accounts = config.get('demo_accounts')
+    if config.get('cyber') and (not config.get('identity') or (config.get('hosted',True) and demo_accounts is not None)):
+        raise ValueError('Cyber mode needs individual identity and disallows hosted demo accounts.')
     if demo_accounts is not None:
         if not config.get('identity') or set(demo_accounts) != {'student', 'responder'}:
             raise ValueError('Demo mode requires exactly one student and one responder account')
@@ -52,11 +54,29 @@ def hosted_runtime(config, data_dir, enable_faults=False):
             shutil.copyfile(reviewed / name, run_dir / name)
         evidence.joinpath('latest.json').write_text(json.dumps(report))
     settings = dict(config, hosted=config.get('hosted',True), combined=True, evidence_dir=str(evidence))
-    enable_faults=enable_faults and not settings['hosted']
+    enable_faults=enable_faults and not settings['hosted'] and not config.get('cyber')
     faults = Faults(data / 'faults.json', enable_faults)
     identity = Identity(data/'server.sqlite',config['session_secret'],mail=config.get('mail',configured_mail())) if config.get('identity') else None
     if demo_accounts is not None:
         identity.seed_demo_accounts(demo_accounts)
+    if config.get('cyber'):
+        from .cyber_cases import Cases
+        from .cyber_evidence import Evidence
+        from .cyber_monitor import Monitor
+        from .mfa import MFA, secret_key
+        mfa_key=secret_key(config.get('mfa_key'))
+        keys={kid:secret_key(key) for kid,key in config.get('evidence_keys',{}).items()}
+        if any(not key or key==mfa_key for key in keys.values()):
+            raise ValueError('Provide dedicated, nonempty evidence keys.')
+        identity.mfa=MFA(identity,mfa_key)
+        identity.monitor=Monitor(identity,config.get('security_rules'))
+        cases=Cases(identity)
+        evidence_store=Evidence(cases,keys,config.get('evidence_active','v1'),
+                                not config.get('ephemeral_storage') and (not settings['hosted'] or config.get('durable_evidence')),
+                                **config.get('evidence_limits',{}))
+        settings['cyber_services']=(cases,evidence_store,identity.monitor)
+        if not 1 <= evidence_store.max_size <= 16*1024**2:
+            raise ValueError('Evidence size must be between 1 byte and 16 MiB.')
     if enable_faults:
         faults.set('normal')
     with tempfile.TemporaryDirectory() as certs:
@@ -67,7 +87,7 @@ def hosted_runtime(config, data_dir, enable_faults=False):
         walks=Walks(identity,store) if identity else None
         rooms=Rooms(identity,store) if identity else None
         box = Outbox(data / 'outbox.sqlite')
-        delivery_fault = box.demo_fault if settings['hosted'] and demo_accounts is not None else None
+        delivery_fault = box.demo_fault if settings['hosted'] and demo_accounts is not None and not config.get('cyber') else None
         with AlertServer(('127.0.0.1', 0), server_context(certs), store,
                          settings['sender_token'], settings['responder_token'], faults,identity,walks,rooms,delivery_fault=delivery_fault) as server:
             server_thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -83,14 +103,14 @@ def hosted_runtime(config, data_dir, enable_faults=False):
                 if kind == 'SUBMIT_ALERT' and delivery_fault and delivery_fault(payload['alert_id']) == 'disconnect':
                     raise ConnectionError('Simulated sender disconnect')
                 return sender_call(kind,payload,dict(intent=payload['alert_id']) if identity else None)
-            worker = Worker(box, worker_call,identity,walks.reconcile if walks else None)
+            worker = Worker(box, worker_call,identity,walks.reconcile if walks and not config.get('cyber') else None)
             worker_thread = threading.Thread(target=worker.run, daemon=True)
             worker_thread.start()
             root = Flask(__name__)
 
             @root.get('/')
             def home():
-                response = root.make_response(render_template('welcome.html',ephemeral_storage=settings.get('ephemeral_storage',False),identity_enabled=bool(identity),demo_login=demo_accounts is not None))
+                response = root.make_response(render_template('cyber_welcome.html' if config.get('cyber') else 'welcome.html',ephemeral_storage=settings.get('ephemeral_storage',False),identity_enabled=bool(identity),demo_login=demo_accounts is not None))
                 response.headers['Cache-Control']='no-store'
                 return response
 
@@ -131,14 +151,18 @@ def main():
     config['allowed_hosts'] = tuple(hosts)
     config['identity'] = True
     config['mail'] = configured_mail() if os.environ.get('SAFESIGNAL_REGISTRATION_ENABLED')=='1' else None
+    config.update(cyber=True,mfa_key=os.environ.get('SECURESIGNAL_MFA_KEY'),
+                  evidence_keys=json.loads(os.environ.get('SECURESIGNAL_EVIDENCE_KEYS','{}')),
+                  evidence_active=os.environ.get('SECURESIGNAL_EVIDENCE_ACTIVE','v1'),
+                  durable_evidence=os.environ.get('SECURESIGNAL_DURABLE_EVIDENCE')=='1')
     invite_file = Path(__file__).resolve().with_name('hosted_invite.json')
-    if invite_file.is_file():
+    if invite_file.is_file() and not config.get('cyber'):
         config['student_invite'] = json.loads(invite_file.read_text(encoding='utf-8'))
     responder_invite = invite_file.with_name('hosted_responder_invite.json')
-    if responder_invite.is_file():
+    if responder_invite.is_file() and not config.get('cyber'):
         config['responder_invite'] = json.loads(responder_invite.read_text(encoding='utf-8'))
     demo_file = invite_file.with_name('hosted_demo_accounts.json')
-    if demo_file.is_file():
+    if demo_file.is_file() and not config.get('cyber'):
         config['demo_accounts'] = json.loads(demo_file.read_text(encoding='utf-8'))
     config['ephemeral_storage'] = os.environ.get('SAFESIGNAL_EPHEMERAL_STORAGE')=='1'
     data_dir = os.environ['SAFESIGNAL_DATA_DIR']
@@ -146,7 +170,8 @@ def main():
         # Only Render ingress reaches this listener. Trust its scheme, never forwarded host.
         serve(app,host='0.0.0.0',port=int(os.environ.get('PORT','10000')),threads=8,
               trusted_proxy='*',trusted_proxy_count=1,
-              trusted_proxy_headers={'x-forwarded-proto'})
+              trusted_proxy_headers={'x-forwarded-proto'},
+              max_request_body_size=5*1024**2+65536,inbuf_overflow=5*1024**2+131072)
 
 
 if __name__ == '__main__':

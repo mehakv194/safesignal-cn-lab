@@ -1,0 +1,31 @@
+{% extends 'cyber_shell.html' %}
+{% block content %}
+<p class="eyebrow">{{ category }}</p><h1>{{ row.title }}</h1><p><code>{{ row.id }}</code></p>
+<section class="panel"><h2>Case summary</h2><p><strong>Investigation:</strong> {{ row.state|replace('_',' ')|title }}</p>
+<p><strong>Delivery:</strong> {{ 'Server storage confirmed. This is not a read receipt.' if row.server_received_at else 'Saved for delivery. The outbox retries automatically.' }}</p>
+<p class="cyber-copy">{{ row.details.description }}</p><dl>
+<dt>First noticed</dt><dd>{{ row.details.noticed }}</dd><dt>Affected service or device</dt><dd>{{ row.details.affected or 'Unknown' }}</dd><dt>Ongoing</dt><dd>{{ row.details.ongoing }}</dd>
+{% for key,label in fields.items() %}{% if row.details[key] %}<dt>{{ label }}</dt><dd class="cyber-copy">{{ row.details[key] }}</dd>{% endif %}{% endfor %}</dl>
+{% if row.outcome %}<h3>Outcome</h3><p class="cyber-copy">{{ row.outcome }}</p>{% endif %}</section>
+<section class="panel"><h2>Evidence</h2>
+{% if evidence_error %}<p class="error" role="alert">Case saved. Attachment failed: {{ evidence_error }}</p>{% endif %}
+{% for file in files %}<article class="cyber-row"><div><a href="{{ url_for('cyber_download',aid=row.id,eid=file.id) }}">{{ file.name }}</a>
+<br><small>{{ file.mime }} · {{ file.size }} bytes · verified on download{% if file.previous %} · revision of {{ file.previous }}{% endif %}</small><br><code>{{ file.hash }}</code></div></article>
+{% else %}<p>No evidence attached.</p>{% endfor %}
+{% if files %}<p><a href="{{ url_for('cyber_manifest',aid=row.id) }}">Download evidence manifest</a></p>{% endif %}
+{% if evidence.enabled %}<form class="cyber-form" method="post" enctype="multipart/form-data" action="{{ url_for('cyber_upload',aid=row.id) }}">
+<input type="hidden" name="csrf" value="{{ session.csrf }}"><label for="file">Attach redacted PNG, JPEG, TXT, LOG, or EML</label><input id="file" name="file" type="file" accept=".png,.jpg,.jpeg,.txt,.log,.eml" required>
+{% if files %}<label for="previous">Version relationship</label><select id="previous" name="previous"><option value="">New evidence</option>{% for file in files %}<option value="{{ file.id }}">{{ file.name }} · {{ file.id[:8] }}</option>{% endfor %}</select>{% endif %}
+<button class="button">Attach evidence</button></form>{% else %}<p>Evidence upload is unavailable in this environment.</p>{% endif %}</section>
+<section class="panel"><h2>Private conversation</h2>
+{% if row.server_received_at %}
+<div data-cyber-messages="{% if not request.args.get('before') %}{{ url_for('cyber_case',aid=row.id,poll=1) }}{% endif %}">{% include 'cyber_room_messages.html' %}</div>
+<form class="cyber-form" data-cyber-message method="post" action="{{ url_for('cyber_message',aid=row.id) }}">
+<input type="hidden" name="csrf" value="{{ session.csrf }}"><input type="hidden" name="client_uuid" value="{{ message_key }}">
+<label for="message">Message</label><textarea id="message" name="body" maxlength="300" required></textarea><button class="button">Send message</button><p data-message-status role="status"></p></form>
+{% else %}<p>Messaging opens after the server confirms receipt.</p>{% endif %}</section>
+<section class="panel"><h2>Investigation timeline</h2>
+{% for entry in timeline %}<article class="cyber-row"><div><strong>{{ entry.state|replace('_',' ')|title }}</strong> · {{ entry.stamp|epoch }} · Actor {{ entry.actor }}<p class="cyber-copy">{{ entry.reason }}</p></div></article>
+{% else %}<p>No investigation actions yet.</p>{% endfor %}
+{% if transitions %}<form class="cyber-form" method="post" action="{{ url_for('cyber_advance',aid=row.id) }}"><input type="hidden" name="csrf" value="{{ session.csrf }}"><input type="hidden" name="operation" value="{{ operation }}"><label for="target">Next action</label><select id="target" name="target">{% for target in transitions %}<option value="{{ target }}">{{ target|replace('_',' ')|title }}</option>{% endfor %}</select><label for="reason">Reason or outcome summary</label><textarea id="reason" name="reason" maxlength="1000" required></textarea><small>For containment or recovery that does not apply, explain why here. The first action assigns the case to you.</small><button class="button">Record action</button></form>{% endif %}</section>
+{% endblock %}

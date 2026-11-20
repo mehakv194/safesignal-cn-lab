@@ -1,0 +1,12 @@
+{% extends 'cyber_shell.html' %}
+{% block content %}
+<h1>Application security alerts</h1><p>Rules over SecureSignal events; this view does not inspect network traffic or private case bodies.</p>
+<section class="panel">{% for item in rows[:20] %}<article class="cyber-row"><a href="{{ url_for('cyber_alerts',id=item.id) }}">{{ item.rule|replace('_',' ')|title }}</a><span>{{ item.status|replace('_',' ')|title }} · {{ item.last|epoch }}</span></article>{% else %}<p>No alerts in this view.</p>{% endfor %}
+{% if rows|length>20 %}<a href="{{ url_for('cyber_alerts',before=rows[19].id) }}">Older alerts</a>{% endif %}</section>
+{% if selected %}<section class="panel"><h2>{{ selected.rule|replace('_',' ')|title }}</h2>
+<p>First observed {{ selected.first|epoch }} · Most recent {{ selected.last|epoch }}. Count: {{ selected.observations }} in {{ selected.window }} seconds (threshold {{ selected.threshold }}).</p>
+<h3>Redacted observations</h3><ul>{% for event in signals %}<li>{{ event.stamp|epoch }} · {{ event.actor or event.account or 'Pseudonymous source' }}{% if event.target %} · Reference {{ event.target }}{% endif %}</li>{% endfor %}</ul>
+<h3>Review history</h3><ul>{% for item in history %}<li>{{ item.status|replace('_',' ')|title }} · {{ item.stamp|epoch }} · {{ item.reason }} ({{ item.actor }})</li>{% else %}<li>Not yet reviewed.</li>{% endfor %}</ul>
+{% if next_status.get(selected.status) %}<form class="cyber-form" method="post" action="{{ url_for('cyber_review',aid=selected.id) }}">
+<input type="hidden" name="csrf" value="{{ session.csrf }}"><label for="target">Review action</label><select id="target" name="target">{% for state in next_status[selected.status] %}<option value="{{ state }}">{{ state|replace('_',' ')|title }}</option>{% endfor %}</select><label for="reason">Reason</label><textarea name="reason" id="reason" maxlength="500" required></textarea><button class="button">Record review</button></form>{% endif %}</section>{% endif %}
+{% endblock %}

@@ -1,0 +1,9 @@
+{% extends 'cyber_shell.html' %}
+{% block content %}
+<h1>Sessions</h1><section class="panel"><h2>Active sessions</h2>
+{% for item in sessions %}<article class="cyber-row"><div><strong>{{ 'This session' if item.current else 'Other session' }}</strong><br>Created {{ item.created|epoch }} · Active {{ item.last_seen|epoch }}</div>
+<form method="post"><input type="hidden" name="csrf" value="{{ session.csrf }}"><input type="hidden" name="reference" value="{{ item.reference }}"><button class="button secondary">Revoke{{ ' this session' if item.current }}</button></form></article>
+{% endfor %}</section>
+{% if role=='responder' %}<section class="panel"><h2>Replace authenticator</h2><p>This signs out all sessions and requires a new enrollment.</p>
+<form class="cyber-form" method="post" action="{{ url_for('cyber_replace') }}"><input type="hidden" name="csrf" value="{{ session.csrf }}"><label for="current">Current password</label><input id="current" name="password" type="password" maxlength="128" autocomplete="current-password" required><label for="factor">Current authenticator or recovery code</label><input id="factor" name="code" maxlength="32" autocomplete="one-time-code" required><button class="button">Verify and replace</button></form></section>{% endif %}
+{% endblock %}

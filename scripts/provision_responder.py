@@ -11,7 +11,7 @@ from safesignal.models import RESPONSE_TEAMS
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('email')
-    parser.add_argument('--team',required=True,choices=RESPONSE_TEAMS)
+    parser.add_argument('--team',required=True,choices=('Cyber Response','Security Review',*RESPONSE_TEAMS))
     parser.add_argument('--legacy-demo',action='store_true')
     args=parser.parse_args()
     identity=Identity(Path(os.environ['SAFESIGNAL_DATA_DIR'])/'server.sqlite',os.environ['SAFESIGNAL_SESSION_SECRET'])

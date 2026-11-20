@@ -1,0 +1,29 @@
+{% extends 'cyber_shell.html' %}
+{% macro field(name, label, id, maximum=400, long=false, needed=false, value=none) %}
+<label for="{{ id }}">{{ label }}</label>
+{% set value=fields.get(name,'') if value is none else value %}
+{% if name in choices %}<select id="{{ id }}" name="{{ id }}"{% if errors.get(name) %} aria-invalid="true" aria-describedby="{{ id }}-error"{% endif %}>{% for item in ('unknown','yes','no') %}<option value="{{ item }}"{% if value==item %} selected{% endif %}>{{ item|title }}</option>{% endfor %}</select>
+{% elif long %}<textarea id="{{ id }}" name="{{ id }}" maxlength="{{ maximum }}"{% if needed %} required{% endif %}{% if errors.get(name) %} aria-invalid="true" aria-describedby="{{ id }}-error"{% endif %}>{{ value }}</textarea>
+{% else %}<input id="{{ id }}" name="{{ id }}" value="{{ value }}" maxlength="{{ maximum }}"{% if needed %} required{% endif %}{% if errors.get(name) %} aria-invalid="true" aria-describedby="{{ id }}-error"{% endif %}>{% endif %}
+{% if errors.get(name) %}<p class="error" id="{{ id }}-error">{{ errors[name] }}</p>{% endif %}
+{% endmacro %}
+{% block content %}
+<h1>Report cyber incident</h1><p>Describe what you saw. Leave unknown details blank and redact secrets before attaching evidence.</p>
+{% if errors %}<p class="error" role="alert">Check the highlighted fields. Reattach your file before submitting again.</p>{% endif %}
+<form class="panel cyber-form" method="post" enctype="multipart/form-data" data-cyber-report>
+<input type="hidden" name="csrf" value="{{ session.csrf }}"><input type="hidden" name="operation" value="{{ operation }}">
+<label for="category">Category</label><select id="category" name="category" required{% if errors.category %} aria-invalid="true" aria-describedby="category-error"{% endif %}><option value="">Choose a category</option>{% for key,(label,items) in categories.items() %}<option value="{{ key }}"{% if fields.get('category')==key %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+{% if errors.category %}<p class="error" id="category-error">{{ errors.category }}</p>{% endif %}
+{{ field('title','Short title','title',120,needed=true) }}
+{{ field('description','What happened?','description',3000,true,true) }}
+{{ field('noticed','First noticed (optional, e.g. 2026-11-20T09:30+05:30)','noticed',40) }}
+{{ field('affected','Affected account, service, or device','affected',160) }}
+{{ field('ongoing','Does it appear ongoing?','ongoing') }}
+{% for key,(label,items) in categories.items() %}
+<fieldset data-category="{{ key }}"><legend>{{ label }} · optional details</legend>
+{% for name,label in items.items() %}{{ field(name,label,key~'-'~name,value=fields.get(key~'-'~name,'') if fields.get('category')==key else '') }}{% endfor %}</fieldset>
+{% endfor %}
+<noscript><p>Fill only the details for your chosen category. You can attach evidence from the saved case.</p></noscript>
+{% if evidence.enabled %}<label for="file">Optional evidence (PNG, JPEG, TXT, LOG, EML; up to {{ (evidence.max_size/1048576)|round(1) }} MiB)</label><input id="file" name="file" type="file" data-max-bytes="{{ evidence.max_size }}" accept=".png,.jpg,.jpeg,.txt,.log,.eml">{% else %}<p>Evidence upload is unavailable here. You can still submit your report.</p>{% endif %}
+<button class="button">Submit report</button></form>
+{% endblock %}

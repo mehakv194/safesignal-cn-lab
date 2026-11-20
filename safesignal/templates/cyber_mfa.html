@@ -1,0 +1,12 @@
+{% extends 'cyber_shell.html' %}
+{% block content %}
+<section class="panel identity-panel">
+{% if codes %}<h1>Save your recovery codes</h1><p>Shown once. Each code works once. Store these offline in a safe place.</p><ul>{% for code in codes %}<li><code>{{ code }}</code></li>{% endfor %}</ul><a class="button" href="{{ url_for('home') }}">Continue</a>
+{% else %}
+<h1>{{ 'Set up your authenticator' if uri else 'Verify your sign-in' }}</h1>
+{% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+{% if uri %}<p>Scan with your authenticator app and enter the first code it shows.</p><img width="220" height="220" alt="Authenticator provisioning QR code" src="{{ url_for('cyber_qr') }}"><details><summary>Enter the setup key manually</summary><p><code>{{ uri.split('secret=',1)[1].split('&',1)[0] }}</code></p></details>{% endif %}
+<form class="cyber-form" method="post"><input type="hidden" name="csrf" value="{{ session.csrf }}"><label for="code">{{ 'Authenticator code' if uri else 'Authenticator or recovery code' }}</label><input id="code" name="code" maxlength="32" autocomplete="one-time-code" required><button class="button">Verify</button></form>
+<form method="post" action="{{ url_for('logout') }}"><input type="hidden" name="csrf" value="{{ session.csrf }}"><button class="button secondary">Cancel sign-in</button></form>
+{% endif %}</section>
+{% endblock %}

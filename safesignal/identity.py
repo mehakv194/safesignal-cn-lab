@@ -33,6 +33,8 @@ def canonical(value):
 
 class Identity:
     def __init__(self, path, secret, clock=time.time, mail=None):
+        self.mfa = None
+        self.monitor = None
         self.path, self.clock, self.mail = str(path), clock, mail
         self.key = hmac.digest(secret.encode(), b'safesignal-principal-v2', 'sha256')
         self.hasher = PasswordHasher(time_cost=3, memory_cost=65536, parallelism=4)
@@ -76,6 +78,9 @@ class Identity:
                        (event,result,self.clock(),actor,target_type,str(target_id)[:64],reason))
 
     def failed_login(self,account,ip):
+        if self.monitor:
+            self.monitor.login(account,ip)
+            return
         key=digest(account+'|'+ip)
         with self.connect() as db:
             db.execute('BEGIN IMMEDIATE')
@@ -115,14 +120,14 @@ class Identity:
         with self.password_slots:
             return self.hasher.verify(hashed,value)
 
-    def limit(self, action, account, ip):
+    def limit(self, action, account, ip, *, window=900, maxima=(8,40)):
         stamp = self.clock()
         with self.connect() as db:
             db.execute('BEGIN IMMEDIATE')
             db.execute('DELETE FROM auth_limits WHERE stamp<?', (stamp-900,))
             keys = (digest(action+':account:'+account), digest(action+':ip:'+ip))
-            if any(db.execute('SELECT count(*) FROM auth_limits WHERE key=?', (key,)).fetchone()[0] >= maximum
-                   for key, maximum in zip(keys, (8, 40))):
+            if any(db.execute('SELECT count(*) FROM auth_limits WHERE key=? AND stamp>?', (key,stamp-window)).fetchone()[0] >= maximum
+                   for key, maximum in zip(keys, maxima)):
                 db.execute('INSERT INTO security_events(event,result,stamp) VALUES(?,?,?)',
                            ('AUTH_THROTTLED', 'DENIED', stamp))
                 return False
@@ -210,8 +215,10 @@ class Identity:
             else:
                 db.execute('UPDATE users SET password_hash=? WHERE id=?', (hashed, row['user_id']))
             db.execute('DELETE FROM sessions WHERE user_id=?', (row['user_id'],))
+            if self.mfa:
+                db.execute('DELETE FROM mfa_pending WHERE user_id=?', (row['user_id'],))
 
-    def login(self, email, password, role, ip=''):
+    def login(self, email, password, role, ip='', *, pending=False):
         try:
             email = email_address(email)
         except ValueError:
@@ -225,11 +232,15 @@ class Identity:
         if not valid or not user or not user['verified'] or user['disabled'] or user['role'] != role:
             self.failed_login(email,ip)
             return None
-        sid = secrets.token_urlsafe(32)
-        stamp = self.clock()
+        if role=='responder' and self.mfa:
+            return self.mfa.begin(user['id'],user['password_hash']) if pending else None
         with self.connect() as db:
-            db.execute('INSERT INTO sessions VALUES(?,?,?,?,?)',
-                       (digest(sid), user['id'], stamp, stamp, stamp+8*3600))
+            return self.new_session(db,user['id'],self.clock())
+
+    @staticmethod
+    def new_session(db, uid, stamp):
+        sid = secrets.token_urlsafe(32)
+        db.execute('INSERT INTO sessions VALUES(?,?,?,?,?)',(digest(sid), uid, stamp, stamp, stamp+8*3600))
         return sid
 
     def user(self, sid):
@@ -237,6 +248,10 @@ class Identity:
             row = db.execute('''SELECT u.*,s.created AS login_at FROM users u JOIN sessions s
                 ON s.user_id=u.id WHERE s.hash=? AND s.expires>? AND s.last_seen>?
                 AND u.verified=1 AND u.disabled=0''', (digest(sid), self.clock(), self.clock()-1800)).fetchone()
+            if row and self.mfa and row['role']=='responder' and (not self.mfa.key or not db.execute(
+                'SELECT 1 FROM mfa_sessions m JOIN mfa_factors f ON f.user_id=? WHERE m.hash=?',
+                (row['id'],digest(sid))).fetchone()):
+                return None
             if row:
                 db.execute('UPDATE sessions SET last_seen=? WHERE hash=?', (self.clock(), digest(sid)))
         return dict(row) if row else None
@@ -258,9 +273,11 @@ class Identity:
             db.execute('UPDATE users SET password_hash=? WHERE id=?',
                        (self.hash_password(replacement), user['id']))
             db.execute('DELETE FROM sessions WHERE user_id=?', (user['id'],))
+            if self.mfa:
+                db.execute('DELETE FROM mfa_pending WHERE user_id=?',(user['id'],))
 
     def provision(self, email, team, legacy=False):
-        if team not in RESPONSE_TEAMS:
+        if team not in (*RESPONSE_TEAMS, 'Cyber Response', 'Security Review'):
             raise ValueError('Choose an authorized demo team.')
         with self.connect() as db:
             changed = db.execute("UPDATE users SET role='responder',team=?,legacy=? WHERE email=? AND verified=1 AND disabled=0",
@@ -268,6 +285,8 @@ class Identity:
             if not changed:
                 raise ValueError('A verified eligible account is required.')
             db.execute('DELETE FROM sessions WHERE user_id=(SELECT id FROM users WHERE email=?)', (email_address(email),))
+            if db.execute("SELECT 1 FROM sqlite_master WHERE name='mfa_pending'").fetchone():
+                db.execute('DELETE FROM mfa_pending WHERE user_id=(SELECT id FROM users WHERE email=?)',(email_address(email),))
             db.execute('INSERT INTO security_events(event,result,stamp) VALUES(?,?,?)',
                        ('RESPONDER_PROVISIONED', 'ALLOWED', self.clock()))
 

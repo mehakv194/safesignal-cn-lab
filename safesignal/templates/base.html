@@ -1,1 +1,1 @@
-{% extends 'shell_v2.html' if identity_enabled else 'shell_legacy.html' %}
+{% extends 'cyber_shell.html' if cyber_mode else 'shell_v2.html' if identity_enabled else 'shell_legacy.html' %}

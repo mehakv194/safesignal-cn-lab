@@ -1,0 +1,17 @@
+.cyber-shell{width:min(100% - 2rem,64rem);margin:auto;overflow-wrap:anywhere}
+.cyber-header{padding:1rem 0;border-bottom:1px solid #d3e4dd;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem}
+.cyber-nav{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}
+.cyber-nav a{display:inline-flex;align-items:center;min-height:44px;padding:.4rem .6rem}
+.cyber-shell main{padding:1.5rem 0}
+.cyber-shell .panel{margin:0 0 1rem;min-width:0}
+.cyber-form{display:grid;gap:.55rem;margin:1rem 0;max-width:44rem}
+.cyber-form label{margin-top:.4rem}
+.cyber-form [hidden]{display:none}
+.cyber-form :is(input,select,textarea),.cyber-shell img{max-width:100%}
+.cyber-form fieldset{min-width:0;padding:1rem;border:1px solid #a6c1b6;border-radius:.65rem}
+.cyber-form fieldset label{display:block}
+.cyber-row{display:flex;justify-content:space-between;align-items:center;gap:1rem;padding:.75rem 0;border-bottom:1px solid #d3e4dd;flex-wrap:wrap}
+.cyber-row:last-child{border-bottom:0}
+.cyber-copy{white-space:pre-wrap}
+.cyber-shell footer{padding:1rem 0 2rem;color:#36584e}
+.cyber-shell :focus-visible{outline:3px solid #105e4f;outline-offset:3px}

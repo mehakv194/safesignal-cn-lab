@@ -84,6 +84,8 @@ class AlertServer(socketserver.ThreadingTCPServer):
                 principal = self.identity.principal(req)
                 if principal['role'] != ('student' if role=='sender' else 'responder'):
                     return dict(status='ERROR',code='UNAUTHORIZED',request_id=rid)
+                if self.identity.mfa and not principal.get('job') and kind not in ('ROOM_GET','ROOM_SEND'):
+                    return dict(status='ERROR',code='UNAUTHORIZED',request_id=rid)
                 if kind in ('GET_STATUS','GET_AUDIT','ACK_ALERT','UPDATE_INCIDENT') and not self.store.authorized(principal,payload.get('alert_id')):
                     self.identity.audit('OBJECT_DENIED','DENIED',principal['id'],'incident',payload.get('alert_id'),'OWNER_OR_TEAM')
                     return dict(status='ERROR',code='NOT_FOUND',request_id=rid)

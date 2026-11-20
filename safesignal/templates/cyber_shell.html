@@ -1,0 +1,17 @@
+{% from 'icons.html' import icon %}
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SecureSignal · Campus cyber response</title>
+<link rel="icon" href="{{ url_for('static',filename='safesignal-192.png') }}">
+<link rel="stylesheet" href="{{ url_for('static',filename='styles.css') }}">
+<link rel="stylesheet" href="{{ url_for('static',filename='mobile.css') }}">
+<link rel="stylesheet" href="{{ url_for('static',filename='cyber.css') }}">
+<script defer src="{{ url_for('static',filename='cyber.js') }}"></script></head>
+<body class="v2"><a class="skip-link" href="#main">Skip to content</a><div class="cyber-shell">
+<header class="cyber-header"><a class="v2-brand" href="/">{{ icon('pulse') }}SecureSignal</a>
+{% if current_user %}<nav class="cyber-nav" aria-label="Workspace">
+{% if role=='sender' %}<a href="{{ url_for('home') }}">Home / My cases</a><a href="{{ url_for('cyber_report') }}">Report incident</a>
+{% elif current_user.team=='Security Review' %}<a href="{{ url_for('cyber_alerts') }}">Security alerts</a>
+{% else %}<a href="{{ url_for('home') }}">Case queue</a><a href="{{ url_for('home',view='assigned') }}">Assigned cases</a>{% endif %}
+<a href="{{ url_for('profile') }}">Account</a><a href="{{ url_for('cyber_sessions') }}">Sessions</a></nav>{% endif %}</header>
+<main id="main" tabindex="-1">{% block content %}{% endblock %}</main>
+<footer>SecureSignal · Campus cyber incident reporting. Never share credentials, codes, or keys.</footer></div></body></html>

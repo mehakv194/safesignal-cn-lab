@@ -1,0 +1,10 @@
+{% extends 'cyber_shell.html' %}
+{% block content %}
+<p class="eyebrow">SecureSignal · {{ 'Student' if role=='sender' else 'Cyber Response' }}</p>
+<h1>{{ 'My cases' if role=='sender' else 'Assigned cases' if assigned else 'Case queue' }}</h1>
+{% if role=='sender' %}<p>Report a cyber concern and track its delivery and investigation separately.</p><p><a class="button" href="{{ url_for('cyber_report') }}">Report incident</a></p>{% endif %}
+<div class="panel">{% for row in rows %}<article class="cyber-row"><div><a href="{{ url_for('cyber_case',aid=row.id) }}"><strong>{{ row.title }}</strong></a><br><small>{{ categories[row.category][0] }}</small></div>
+<div>{{ row.state|replace('_',' ')|title }}<br><small>{{ 'Server receipt confirmed' if row.server_received_at else 'Queued for delivery' }}</small></div></article>
+{% else %}<p>{{ 'You have no cyber cases yet.' if role=='sender' else 'There are no cases in this queue.' }}</p>{% endfor %}</div>
+<nav class="cyber-nav" aria-label="Case pages">{% if offset %}<a href="{{ url_for('home',offset=offset-20,view='assigned' if assigned else '') }}">Previous</a>{% endif %}{% if more %}<a href="{{ url_for('home',offset=offset+20,view='assigned' if assigned else '') }}">Next</a>{% endif %}</nav>
+{% endblock %}
